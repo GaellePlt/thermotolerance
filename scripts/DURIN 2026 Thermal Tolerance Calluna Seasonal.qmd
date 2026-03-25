@@ -567,6 +567,15 @@ ggplot(data %>%  filter(proj_2025 == "Traits"),
 #| label: calculate SLA and LDMC
 
 # Specific Leaf Area (SLA)
+
+####______________INTERPRETATION_____________
+
+## SLA = Leaf Area / Leaf dry mass
+## High SLA means fast-growing plants ("Acquisitive strategy"). These plants have thin, flexible leaves that capture light efficiently.
+## Low SLA means slow-growing plants ("Conservative strategy"). These plants have thick, leathery leaves designed to last a long time and resist stress.
+
+##___________________________________________
+
 data <- data %>%  
   mutate(
     SLA = ifelse(
@@ -578,6 +587,16 @@ data <- data %>%
 
 
 # Leaf Dry Matter Content (LDMC)
+
+####______________INTERPRETATION_____________
+
+## LDMC = Leaf Dry Mass / Leaf Fresh Mass
+## varies between 0 and 1
+## High LDMC: Leaves are dense, high in lignin/cellulose, and low in water. They are very resistant to physical hazards and drought.
+## Low LDMC: Leaves are "succulent" or watery.
+
+##___________________________________________
+
 data <- data %>% 
   mutate(
     LDMC = ifelse( # making new ldmc column
