@@ -193,7 +193,7 @@ Above was cleaning of column names, formatting of variables etc. Now we need to 
 unique(data$remark)
 
 # Multiple comment strings in the column (EXAMPLE ONLY AT THE MOMENT!)
-## firts observation : some REMARKS are the same but with capital letters for example
+## first observation : some REMARKS are the same but with capital letters for example
 
 library(dplyr)
 library(stringr)
@@ -318,7 +318,7 @@ data <- data %>%
     grepl("5 leaves at dry mass", remark) ~ 5,
     .default = bulk_nr_dry_mass    # Keep original bulk nr value if no comment is applied to row
   ))
-
+#ok?
 ```
 
 ```{r}
@@ -336,7 +336,7 @@ data <- data %>%
     leaf_area = round(leaf_area, digits = 3),
     dry_mass = round(dry_mass, digits =  5)
   )
-
+#ok!
 ```
 
 # Check trait outliers
