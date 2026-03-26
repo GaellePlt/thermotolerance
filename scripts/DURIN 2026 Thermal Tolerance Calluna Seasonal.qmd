@@ -402,6 +402,10 @@ ggplot(data %>%  filter(proj_2025 == "Traits"),
   ) +
   
   theme_bw()
+
+# vegetation height --> ok
+# flower height --> NB 7 without flowering height but ok
+# flowering height always bigger than vegetative height --> height
 ```
 
 ```{r}
@@ -421,7 +425,7 @@ ggplot(data %>%  filter(proj_2025 == "Traits"),
     title = "Mean wet mass per leaf by plant, age class and month"
   ))
 
-
+# wet mass ok exept one for PIO 5 ~ 0.007
 ```
 
 ```{r}
@@ -466,6 +470,10 @@ ggplot(data %>%  filter(proj_2025 == "Traits"),
     y = "Leaf area (mm2)",
     title = "Leaf area by plant, age class and month"
   )
+
+# bigger leaves for NB and smaller for the others
+# for PIO : leaf area small edited image bigger than non edited one --> ?
+# small edited images seem often to be plant 5 to 8 and large one plante 1 to 4
 ```
 
 ```{r}
@@ -508,6 +516,8 @@ ggplot(data_long_thickness, #plotting drom long format
     title = "Leaf thickness replicates by plant, age class and month"
   )
 
+# weird values to check : BUI 1 19 0.25 ; BUI 8 20 0.6
+# BUI 1 19 0.25 --> seems ok ; BUI 8 20 0.6 ; PIO 2 20 0.6
 ```
 
 ```{r}
@@ -526,6 +536,7 @@ ggplot(data |> filter(proj_2025 == "Traits"),
     title = "Mean dry mass per leaf by plant, age class and month"
   )
 
+# values seem ok ; may be PIO 5 values are a little bit higher than the others PIO
 ```
 
 ```{r}
@@ -557,6 +568,10 @@ ggplot(data %>%  filter(proj_2025 == "Traits"),
   
   theme_bw()
 
+# according to the graph, dry mass always smaller than wet mass --> ok
+# most of the plant have similar dry and wet mass
+# relationship between dry and wet mass seem to be linear
+# 2 low values for dry mass plant 6 for BUI and MAT (according to the graph just above)
 ```
 
 # Calculate SLA and LDMC
@@ -570,9 +585,9 @@ ggplot(data %>%  filter(proj_2025 == "Traits"),
 
 ####______________INTERPRETATION_____________
 
-## SLA = Leaf Area / Leaf dry mass
-## High SLA means fast-growing plants ("Acquisitive strategy"). These plants have thin, flexible leaves that capture light efficiently.
-## Low SLA means slow-growing plants ("Conservative strategy"). These plants have thick, leathery leaves designed to last a long time and resist stress.
+## SLA = Leaf Area (mm²) / Leaf dry mass (g)
+## High SLA (> 300 000 mm²/g) means fast-growing plants ("Acquisitive strategy"). These plants have thin, flexible leaves that capture light efficiently.
+## Low SLA (< 100 000 mm²/g) means slow-growing plants ("Conservative strategy"). These plants have thick, leathery leaves designed to last a long time and resist stress. --> Calluna vulgaris
 
 ##___________________________________________
 
@@ -590,10 +605,10 @@ data <- data %>%
 
 ####______________INTERPRETATION_____________
 
-## LDMC = Leaf Dry Mass / Leaf Fresh Mass
+## LDMC = Leaf Dry Mass (g)/ Leaf Fresh Mass (g)
 ## varies between 0 and 1
-## High LDMC: Leaves are dense, high in lignin/cellulose, and low in water. They are very resistant to physical hazards and drought.
-## Low LDMC: Leaves are "succulent" or watery.
+## High LDMC (0.5 - 0.7) : Leaves are dense, high in lignin/cellulose, and low in water. They are very resistant to physical hazards and drought.
+## Low LDMC (0;05 - 0.5) : Leaves are "succulent" or watery.
 
 ##___________________________________________
 
@@ -622,6 +637,10 @@ ggplot(data %>%  filter(proj_2025 == "Traits"),
     y = "SLA",
     title = "Mean SLA per leaf by plant, age class and month"
   )
+
+# higher SLA for NB than MAT --> ok 
+# high value for BUI 6 probably linked to the low value of dry mass
+# no weird value for MAT 6 even if low value for dry mass
 ```
 
 ```{r}
@@ -639,6 +658,9 @@ ggplot(data %>%  filter(proj_2025 == "Traits"),
     y = "Leaf Dry Matter Content (LDMC)",
     title = "Mean LDMC per leaf by plant, age class and month"
   )
+
+# LDMC rise with the age of the plant --> ok because leaves from mature plant are more structured with lignine for example
+# weird value for BUI 6 and MAT 6 --> may be linked to the 2 low values in the graph of dry mass
 ```
 
 # Fluorescence Outlier Checking
