@@ -559,7 +559,7 @@ ggplot(data |> filter(proj_2025 == "Traits"),
 
 
 ggplot(data %>%  filter(proj_2025 == "Traits"),
-       aes(x = wet_mass, y = dry_mass)) +
+       aes(x = wet_mass_g, y = dry_mass_g)) +
   
   # scatter points
   geom_point(aes(colour = factor(plant_nr)),
@@ -587,6 +587,34 @@ ggplot(data %>%  filter(proj_2025 == "Traits"),
 # most of the plant have similar dry and wet mass
 # relationship between dry and wet mass seem to be linear
 # 2 low values for dry mass plant 6 for BUI and MAT (according to the graph just above) --> explain by the fact that the dry mass is already lower than other and we divide it by five since there is five which make it even lower --> high chance the leaves aren't all from this individual --> we may remove this individual later on
+
+ggplot(data %>%  filter(proj_2025 == "Traits"),
+       aes(x = wet_mass_g, y = dry_mass_g)) +
+  
+  # scatter points
+  geom_point(aes(colour = factor(plant_nr)),
+             size = 2, alpha = 0.7) +
+  
+  # 1:1 reference line
+  geom_abline(slope = 1, intercept = 0,
+              linetype = "dashed", colour = "grey50") +
+  
+  # fitted regression line
+  geom_smooth(method = "lm", se = TRUE, colour = "blue") +
+  
+  facet_wrap(~ age_class) + # wet mass vs dry mass graphs facet by the age classes.
+  
+  # optional: label
+  labs(
+    x = "Wet mass per leaf (g)",
+    y = "Dry mass per leaf (g)",
+    title = "Dry mass vs wet mass per leaf",
+    subtitle = "Dashed line = 1:1 reference, blue line = fitted linear trend",
+    colour = "plant_nr"
+  ) +
+  
+  theme_bw()
+  
 ```
 
 # Calculate SLA and LDMC
