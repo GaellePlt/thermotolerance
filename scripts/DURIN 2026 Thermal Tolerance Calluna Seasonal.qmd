@@ -761,4 +761,14 @@ ggplot(data %>%  filter(proj_2025 == "Traits"),
     title = "Final fluorescence TT Cold by plant, age class and month"
   ))
 # one value is registered as a January one --> modification is in data cleaning entire frame
+
+## idea for next time try to see per plant or with leaves may be per temperature
+```
+
+```{r}
+#| label: check fluorescence outliers TT Hot
+```
+
+```{r}
+#| label: check fluorescence outliers TT Cold
 ```
