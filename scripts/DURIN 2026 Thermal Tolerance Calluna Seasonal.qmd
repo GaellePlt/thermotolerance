@@ -551,6 +551,7 @@ ggplot(data |> filter(proj_2025 == "Traits"),
   )
 
 # values seem ok ; may be PIO 5 values are a little bit higher than the others PIO
+# 2 low values for dry mass plant 6 for BUI and MAT
 ```
 
 ```{r}
@@ -585,7 +586,7 @@ ggplot(data %>%  filter(proj_2025 == "Traits"),
 # according to the graph, dry mass always smaller than wet mass --> ok
 # most of the plant have similar dry and wet mass
 # relationship between dry and wet mass seem to be linear
-# 2 low values for dry mass plant 6 for BUI and MAT (according to the graph just above)
+# 2 low values for dry mass plant 6 for BUI and MAT (according to the graph just above) --> explain by the fact that the dry mass is already lower than other and we divide it by five since there is five which make it even lower --> high chance the leaves aren't all from this individual --> we may remove this individual later on
 ```
 
 # Calculate SLA and LDMC
