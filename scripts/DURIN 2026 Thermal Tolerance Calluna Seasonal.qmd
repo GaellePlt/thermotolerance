@@ -614,7 +614,10 @@ ggplot(data %>%  filter(proj_2025 == "Traits"),
   ) +
   
   theme_bw()
-  
+
+# for PIO 5 values are isolated 
+# accordig to the dry mass graph it as a higher dry mass than others and a higher wet mass too 
+
 ```
 
 # Calculate SLA and LDMC
