@@ -239,6 +239,13 @@ data <- data %>%
     grepl("January", month) ~ "March",
     TRUE ~ month
   ))
+
+## temp_exp --> témoin
+data <- data %>%
+  mutate(temp_exp = case_when(
+    is.na(temp_exp) ~ "témoin",  # replace NA by "témoin"
+    TRUE ~ as.character(temp_exp)
+  ))
 ```
 
 # Calculate per leaf trait values
@@ -770,7 +777,7 @@ ggplot(data %>%  filter(proj_2025 == "Traits"),
 
 
 data %>% 
-  filter(proj_2025 == "TT Hot", age_class == "Newly Burnt") %>% 
+  filter(proj_2025 == "TT Hot") %>% 
   
   ggplot(aes(x = factor(temp_exp), y = fv_fm_final, colour = factor(temp_exp))) +
   
@@ -792,6 +799,7 @@ data %>%
   
   facet_grid(age_class ~ month) +
   theme_bw()
+
 ```
 
 ```{r}
