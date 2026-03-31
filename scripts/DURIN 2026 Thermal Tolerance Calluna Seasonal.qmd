@@ -241,11 +241,11 @@ data <- data %>%
   ))
 
 ## temp_exp --> témoin
-data <- data %>%
-  mutate(temp_exp = case_when(
-    is.na(temp_exp) ~ "témoin",  # replace NA by "témoin"
-    TRUE ~ as.character(temp_exp)
-  ))
+#data <- data %>%
+  #mutate(temp_exp = case_when(
+    #is.na(temp_exp) ~ "témoin",  # replace NA by "témoin"
+    #TRUE ~ as.character(temp_exp)
+  #))
 ```
 
 # Calculate per leaf trait values
@@ -769,7 +769,12 @@ ggplot(data %>%  filter(proj_2025 == "Traits"),
   ))
 # one value is registered as a January one --> modification is in data cleaning entire frame
 
-## idea for next time try to see per plant or with leaves may be per temperature
+#### Initial fluorescence
+# MAT 3 have a high fv/fm ; same for BUI 5 
+# low points for NB 5, 7 and 8 --> maybe due to the season
+
+#### final fluorescence TT Hot 
+# High value for BUI 4 (we don't have that in the initial fluo graph)
 ```
 
 ```{r}
@@ -779,21 +784,21 @@ ggplot(data %>%  filter(proj_2025 == "Traits"),
 data %>% 
   filter(proj_2025 == "TT Hot") %>% 
   
-  ggplot(aes(x = factor(temp_exp), y = fv_fm_final, colour = factor(temp_exp))) +
+  ggplot(aes(x = as.numeric(as.character(temp_exp)), y = fv_fm_final)) +
   
   geom_point(size = 2, alpha = 0.8,
              position = position_jitter(width = 0.15)) +
 
-  geom_line(
-    data = ~ .x %>% 
-      filter(!is.na(fv_fm_final), !is.na(temp_exp)) %>% 
-      group_by(temp_exp, age_class, month) %>% 
-      summarise(mean_fv = mean(fv_fm_final), .groups = "drop"),
-    
-    aes(x = factor(temp_exp), y = mean_fv, group = 1),
-    colour = "blue",
-    linewidth = 1
-  ) +
+  # geom_line(
+  #   data = ~ .x %>% 
+  #    filter(!is.na(fv_fm_final), !is.na(temp_exp)) %>% 
+  #     group_by(temp_exp, age_class, month) %>% 
+  #     summarise(mean_fv = mean(fv_fm_final), .groups = "drop"),
+  #   
+  #   aes(x = factor(temp_exp), y = mean_fv, group = 1),
+  #   colour = "blue",
+  #   linewidth = 1
+  # ) +
   
   
   
