@@ -784,29 +784,46 @@ ggplot(data %>%  filter(proj_2025 == "Traits"),
 data %>% 
   filter(proj_2025 == "TT Hot") %>% 
   
-  ggplot(aes(x = as.numeric(as.character(temp_exp)), y = fv_fm_final)) +
+  ggplot(aes(x = as.numeric(as.character(temp_exp)), 
+             y = fv_fm_final,
+             group = plant_nr,      
+             color = plant_nr)) +
   
   geom_point(size = 2, alpha = 0.8,
              position = position_jitter(width = 0.15)) +
+  geom_line() +
 
-  # geom_line(
-  #   data = ~ .x %>% 
-  #    filter(!is.na(fv_fm_final), !is.na(temp_exp)) %>% 
-  #     group_by(temp_exp, age_class, month) %>% 
-  #     summarise(mean_fv = mean(fv_fm_final), .groups = "drop"),
-  #   
-  #   aes(x = factor(temp_exp), y = mean_fv, group = 1),
-  #   colour = "blue",
-  #   linewidth = 1
-  # ) +
-  
-  
-  
   facet_grid(age_class ~ month) +
-  theme_bw()
+  theme_bw() +
+  labs(
+    x = "Temperature",
+    y = "fv_fm_final",
+    title = "Fv/Fm response to hot temperature across plants, age classes and months"
+  )
 
 ```
 
 ```{r}
 #| label: check fluorescence outliers TT Cold
+
+data %>% 
+  filter(proj_2025 == "TT Cold") %>% 
+  
+  ggplot(aes(x = as.numeric(as.character(temp_exp)), 
+             y = fv_fm_final,
+             group = plant_nr,      
+             color = plant_nr)) +
+  
+  geom_point(size = 2, alpha = 0.8,
+             position = position_jitter(width = 0.15)) +
+  geom_line() +
+
+  facet_grid(age_class ~ month) +
+  theme_bw() +
+  labs(
+    x = "Temperature",
+    y = "fv_fm_final",
+    title = "Fv/Fm response to cold temperature across plants, age classes and months"
+  )
+
 ```
