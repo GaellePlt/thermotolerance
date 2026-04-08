@@ -859,12 +859,13 @@ united_columns_h_DN <- unite(
 #remotes::install_github("richardjtelford/thermalTolerance")
 #library(thermalTolerance)
 
+
 htol_DN_march <- psiiht(temperature = as.numeric(as.character(united_columns_h_DN$temp_exp)), 
                warming = TRUE,
                fvfm = as.numeric(as.character(united_columns_h_DN$fv_fm_final)),
                control_temp = 20,
                id = united_columns_h_DN$new_id,
-               boots = 5)#boots can be higher when the script is working
+               boots = 50)#boots can be higher when the script is working
 
 htol_DN_march_sum <- summary(htol_DN_march) # see summary output for T50 values (note, just means)
 # no results for BUI and MAT --> maybe du to the weird curves we obtained earlyer
@@ -872,6 +873,121 @@ htol_DN_march_sum <- summary(htol_DN_march) # see summary output for T50 values 
 autoplot(htol_DN_march) # plots logistic curves and dashed lines for Tcrit, T50, T95
 
 #working for 5 boots
+```
+
+```{r}
+#| label: Calculate T50 curves per age_class with progression barre
+library(pbapply)
+
+# definition of the progression barre
+pboptions(type = "timer", char = "=", style = 3)
+
+
+htol_list <- pblapply(split(united_columns_h_DN, united_columns_h_DN$new_id), function(df) {
+  psiiht(temperature = as.numeric(as.character(df$temp_exp)), 
+         warming = TRUE,
+         fvfm = as.numeric(as.character(df$fv_fm_final)),
+         control_temp = 20,
+         id = df$new_id,
+         boots = 5)
+})
+
+htol_DN_march_sum <- summary(htol_DN_march) # see summary output for T50 values (note, just means)
+# no results for BUI and MAT --> maybe du to the weird curves we obtained earlyer
+
+autoplot(htol_DN_march) # plots logistic curves and dashed lines for Tcrit, T50, T95
+```
+
+```{r}
+#| label: plots
+# Create a summary table that provides the median, standard error, and lower (2.5%) and upper (2.5%) quantiles for each ID and each thermal metric (T50, T95 and Tcrit)
+
+summarise_htol <- function(res, id) {
+  
+  # si c'est null on met des NA pour que ça ne bloque pas
+  if (is.null(res)) {
+    return(data.frame(
+      id = id,
+      metric = c("T50", "T95", "Tcrit"),
+      estimate = NA,
+      se = NA,
+      lower = NA,
+      upper = NA
+    ))
+  } 
+  
+  # sinon on calucule normalement
+  data.frame(
+    id = id,
+    metric = c("T50", "T95", "Tcrit"),
+    estimate = c(median(res$T50, na.rm = TRUE),
+                 median(res$T95, na.rm = TRUE),
+                 median(res$Tcrit, na.rm = TRUE)),
+    se = c(sd(res$T50, na.rm = TRUE),
+           sd(res$T95, na.rm = TRUE),
+           sd(res$Tcrit, na.rm = TRUE)),
+    lower = c(quantile(res$T50, 0.025, na.rm = TRUE),
+              quantile(res$T95, 0.025, na.rm = TRUE),
+              quantile(res$Tcrit, 0.025, na.rm = TRUE)),
+    upper = c(quantile(res$T50, 0.975, na.rm = TRUE),
+              quantile(res$T95, 0.975, na.rm = TRUE),
+              quantile(res$Tcrit, 0.975, na.rm = TRUE))
+  )
+}
+
+# Run the summarize function for each ID output
+DN_march_out <- Map(
+  summarise_htol, # function
+  htol_DN_march$results, # extract the results part of the psiiht output
+  names(htol_DN_march$results)  # extract the ID from the psiiht output
+  )
+#semble fonctionner
+
+# Create the dataframe by rowbinding 
+DN_thermal <- do.call(rbind, DN_march_out)
+#on obtient un tableau
+
+# String split back to columns the ID
+DN_wide <- DN_thermal %>%
+  separate_wider_delim(
+    cols = id, # the column to split
+    delim = "_", # how is the column seperated
+    # what should the new columns be called - do in order
+    names = c("site_name", "species", "age_class", "proj_2025") #,
+   # too_many = "merge", # Merges any extra parts into the last column
+   # too_few = "align_start" # Fills missing values with NA
+  ) %>% 
+  # Check the data type of the new output columns and convert if necessary
+   mutate(
+    age_class = factor(age_class),
+    proj_2025 = factor(proj_2025),
+    site_name = factor(site_name),
+    species = factor(species)
+  ) %>% 
+  # Relevel factors in natural order
+  mutate(
+    age_class = factor(age_class, levels = c("Newly Burnt","Pioneer","Building", "Mature")))
+
+# Create a preliminary plot focusing on T50 metric
+DN_wide %>% 
+  filter(metric == "T50") %>% 
+ggplot(aes(x = age_class,
+           y = estimate,
+           color = proj_2025)) +
+  geom_point(size = 3,
+              position = position_dodge(width = 0.3)) +
+  geom_errorbar(aes(ymin = estimate - se, ymax = estimate + se),
+                width = 0.2,
+                position = position_dodge(width = 0.3)) +
+  facet_grid(site_name ~ species) +
+  labs(
+    x = "Age Class",
+    y = "T50 (°C)",
+    color = "TT Hot",
+    title = "T50 by Age Class and TT Hot",
+    subtitle = "Points show mean bootstrap estimate; bars show ±1 SE"
+  ) +
+  theme_bw()
 ```
 
 ```{r}
