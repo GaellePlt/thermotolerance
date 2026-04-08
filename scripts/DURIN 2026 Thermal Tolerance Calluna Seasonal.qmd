@@ -827,3 +827,113 @@ data %>%
   )
 
 ```
+
+# Curves, T50
+
+```{r}
+###COPIE COLLE, A NETTOYER
+
+# Hot subset
+DN_therm <- data_DN %>% 
+  filter(species %in% c("Calluna vulgaris", "Vaccinium vitis-idaea")) %>% 
+  filter(TempExp >= 20) %>% 
+  select(siteID, species, species_ID, age_class, drought_treatmentID, plant_nr, TempExp, TempExpTime, FvFm_Final)
+
+# Create concatenated columns for naming
+united_columns_h_DN <- unite(
+  DN_therm,
+  col = "new_id", 
+  siteID, species, age_class, drought_treatmentID, # plant_nr,
+  sep = "_",
+  remove = TRUE
+) %>% 
+  na.omit()
+
+# Calculate T50 curves
+#remotes::install_github("richardjtelford/thermalTolerance") 
+
+#library(thermalTolerance)
+htol_DN <- psiiht(temperature = united_columns_h_DN$TempExp, 
+               warming = TRUE,
+               fvfm = as.numeric(as.character(united_columns_h_DN$FvFm_Final)),
+               control_temp = 20,
+               id = united_columns_h_DN$new_id,
+               boots = 50)
+
+htol_DN_sum <- summary(htol_DN) # see summary output for T50 values (note, just means)
+autoplot(htol_DN) # plots logistic curves and dashed lines for Tcrit, T50, T95
+
+# Create a summary table that provides the median, standard error, and lower (2.5%) and upper (2.5%) quantiles for each ID and each thermal metric (T50, T95 and Tcrit)
+summarise_htol <- function(res, id) {
+  data.frame(
+    id = id,
+    metric = c("T50", "T95", "Tcrit"),
+    estimate = c(median(res$T50, na.rm = TRUE),
+                 median(res$T95, na.rm = TRUE),
+                 median(res$Tcrit, na.rm = TRUE)),
+    se = c(sd(res$T50, na.rm = TRUE),
+           sd(res$T95, na.rm = TRUE),
+           sd(res$Tcrit, na.rm = TRUE)),
+    lower = c(quantile(res$T50, 0.025, na.rm = TRUE),
+              quantile(res$T95, 0.025, na.rm = TRUE),
+              quantile(res$Tcrit, 0.025, na.rm = TRUE)),
+    upper = c(quantile(res$T50, 0.975, na.rm = TRUE),
+              quantile(res$T95, 0.975, na.rm = TRUE),
+              quantile(res$Tcrit, 0.975, na.rm = TRUE))
+  )
+}
+
+# Run the summarize function for each ID output
+# DroughtNet
+DN_out <- Map(
+  summarise_htol, # function
+  htol_DN$results, # extract the results part of the psiiht output
+  names(htol_DN$results)  # extract the ID from the psiiht output
+  )
+
+# Create the dataframe by rowbinding 
+DN_thermal <- do.call(rbind, DN_out)
+
+# String split back to columns the ID
+DN_wide <- DN_thermal %>%
+  separate_wider_delim(
+    cols = id, # the column to split
+    delim = "_", # how is the column seperated
+    # what should the new columns be called - do in order
+    names = c("siteID", "species", "age_class", "drought_treatmentID") #,
+   # too_many = "merge", # Merges any extra parts into the last column
+   # too_few = "align_start" # Fills missing values with NA
+  ) %>% 
+  # Check the data type of the new output columns and convert if necessary
+   mutate(
+    age_class = factor(age_class),
+    drought_treatmentID = factor(drought_treatmentID),
+    siteID = factor(siteID),
+    species = factor(species)
+  ) %>% 
+  # Relevel factors in natural order
+  mutate(
+    age_class = factor(age_class, levels = c("Pioneer", "Mature")),
+    drought_treatmentID = factor(drought_treatmentID, levels = c("AMB", "EXT")))
+
+# Create a preliminary plot focusing on T50 metric
+DN_wide %>% 
+  filter(metric == "T50") %>% 
+ggplot(aes(x = age_class,
+           y = estimate,
+           color = drought_treatmentID)) +
+  geom_point(size = 3,
+              position = position_dodge(width = 0.3)) +
+  geom_errorbar(aes(ymin = estimate - se, ymax = estimate + se),
+                width = 0.2,
+                position = position_dodge(width = 0.3)) +
+  facet_grid(siteID ~ species) +
+  labs(
+    x = "Age Class",
+    y = "T50 (°C)",
+    color = "Drought Treatment",
+    title = "T50 by Age Class and Drought Treatment",
+    subtitle = "Points show mean bootstrap estimate; bars show ±1 SE"
+  ) +
+  theme_bw()
+```
