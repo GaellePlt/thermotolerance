@@ -825,43 +825,96 @@ data %>%
     y = "fv_fm_final",
     title = "Fv/Fm response to cold temperature across plants, age classes and months"
   )
-
+## we want the curves the other way here
 ```
 
-# Curves, T50
+# Hot T50 curves
 
 ```{r}
-###COPIE COLLE, A NETTOYER
+#| label: table creation per age class
 
 # Hot subset
-DN_therm <- data_DN %>% 
-  filter(species %in% c("Calluna vulgaris", "Vaccinium vitis-idaea")) %>% 
-  filter(TempExp >= 20) %>% 
-  select(siteID, species, species_ID, age_class, drought_treatmentID, plant_nr, TempExp, TempExpTime, FvFm_Final)
+DN_therm <- data %>% 
+  #filter(age_class %in% c("Building", "Mature")) %>% #no results for these two # didn't try yet
+  filter(proj_2025 == "TT Hot") %>% 
+  select(site_name, species, age_class, proj_2025, plant_nr, temp_exp, temp_exp_time, fv_fm_final)
 
 # Create concatenated columns for naming
 united_columns_h_DN <- unite(
   DN_therm,
-  col = "new_id", 
-  siteID, species, age_class, drought_treatmentID, # plant_nr,
+  col = "new_id",
+  site_name, species, age_class, proj_2025, # plant_nr,## see after if we can add it 
   sep = "_",
   remove = TRUE
 ) %>% 
   na.omit()
 
-# Calculate T50 curves
-#remotes::install_github("richardjtelford/thermalTolerance") 
+#working
+```
 
+```{r}
+#| label: Calculate T50 curves per age_class
+
+#install.packages("remotes")
+#remotes::install_github("richardjtelford/thermalTolerance")
 #library(thermalTolerance)
-htol_DN <- psiiht(temperature = united_columns_h_DN$TempExp, 
+
+htol_DN_march <- psiiht(temperature = as.numeric(as.character(united_columns_h_DN$temp_exp)), 
                warming = TRUE,
-               fvfm = as.numeric(as.character(united_columns_h_DN$FvFm_Final)),
+               fvfm = as.numeric(as.character(united_columns_h_DN$fv_fm_final)),
                control_temp = 20,
                id = united_columns_h_DN$new_id,
-               boots = 50)
+               boots = 5)#boots can be higher when the script is working
 
-htol_DN_sum <- summary(htol_DN) # see summary output for T50 values (note, just means)
-autoplot(htol_DN) # plots logistic curves and dashed lines for Tcrit, T50, T95
+htol_DN_march_sum <- summary(htol_DN_march) # see summary output for T50 values (note, just means)
+# no results for BUI and MAT --> maybe du to the weird curves we obtained earlyer
+
+autoplot(htol_DN_march) # plots logistic curves and dashed lines for Tcrit, T50, T95
+
+#working for 5 boots
+```
+
+```{r}
+#| label: table creation per plant
+
+
+# Create concatenated columns for naming
+united_columns_h_DN_plant <- unite(
+  DN_therm,
+  col = "new_id",
+  site_name, species, age_class, proj_2025, plant_nr,
+  sep = "_",
+  remove = TRUE
+) %>% 
+  na.omit()
+
+#working
+```
+
+```{r}
+#| label: Calculate T50 curves per plant
+
+#install.packages("remotes")
+#remotes::install_github("richardjtelford/thermalTolerance")
+#library(thermalTolerance)
+
+htol_DN_march_plant <- psiiht(temperature = as.numeric(as.character(united_columns_h_DN_plant$temp_exp)), 
+               warming = TRUE,
+               fvfm = as.numeric(as.character(united_columns_h_DN_plant$fv_fm_final)),
+               control_temp = 20,
+               id = united_columns_h_DN_plant$new_id,
+               boots = 5)#boots can be higher when the script is working
+
+htol_DN_march_plant_sum <- summary(htol_DN_march_plant) # see summary output for T50 values (note, just means)
+# no results for BUI and MAT --> maybe du to the weird curves we obtained earlyer
+
+autoplot(htol_DN_march_plant) # plots logistic curves and dashed lines for Tcrit, T50, T95
+
+#working for 5 boots, maybe separate the graph
+```
+
+```{r}
+###COPIE COLLE, A NETTOYER
 
 # Create a summary table that provides the median, standard error, and lower (2.5%) and upper (2.5%) quantiles for each ID and each thermal metric (T50, T95 and Tcrit)
 summarise_htol <- function(res, id) {
