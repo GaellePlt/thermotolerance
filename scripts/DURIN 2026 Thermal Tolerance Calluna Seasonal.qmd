@@ -1091,3 +1091,12 @@ ggplot(aes(x = age_class,
 #working for 50 but not 500 ?
 #marche avec 200 mais les barres au niveau de la plante 5 et 4 s'agrandissent 
 ```
+
+# Plant functional traits and T50
+
+```{r}
+#| label: influence of given traits on T50 (informal)
+# given plant functional traits : leaf area, dry mass, SLA, LDMC, height
+
+# --> création d'un nouveau tableau avec les traits et la T50 /!\ nombre de lignes 
+```
