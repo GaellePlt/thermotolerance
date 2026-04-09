@@ -990,7 +990,7 @@ TTHot_march_plant <- psiiht(temperature = as.numeric(as.character(united_columns
                fvfm = as.numeric(as.character(united_columns_htol_march_plant$fv_fm_final)),
                control_temp = 20,
                id = united_columns_htol_march_plant$new_id,
-               boots = 100)#boots can be higher when the script is working
+               boots = 200)#boots can be higher when the script is working
 
 TTHot_march_plant_sum <- summary(TTHot_march_plant) # see summary output for T50 values (note, just means)
 # no results for BUI and MAT --> maybe du to the weird curves we obtained earlyer
@@ -1089,5 +1089,5 @@ ggplot(aes(x = age_class,
   ) +
   theme_bw()
 #working for 50 but not 500 ?
-#marche avec 100 mais les barres au niveau de la plante 5 s'agrandissent 
+#marche avec 200 mais les barres au niveau de la plante 5 et 4 s'agrandissent 
 ```
