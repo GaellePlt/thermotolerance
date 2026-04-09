@@ -808,8 +808,8 @@ data %>%
 
 data %>% 
   filter(proj_2025 == "TT Cold") %>% 
-  
-  ggplot(aes(x = as.numeric(as.character(temp_exp)), 
+  mutate(temp_exp = factor(temp_exp, levels = c("5", "0", "-5", "-10","-15", "-20"))) %>%
+  ggplot(aes(x = temp_exp, 
              y = fv_fm_final,
              group = plant_nr,      
              color = plant_nr)) +
@@ -825,7 +825,6 @@ data %>%
     y = "fv_fm_final",
     title = "Fv/Fm response to cold temperature across plants, age classes and months"
   )
-## we want the curves the other way here
 ```
 
 # Hot T50 curves
