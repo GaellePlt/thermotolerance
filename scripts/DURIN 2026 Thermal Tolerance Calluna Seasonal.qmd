@@ -831,13 +831,19 @@ data %>%
 # Hot T50 curves
 
 ```{r}
-#| label: Create table (age_class)
+#| label: Create data frame
 
 # Create table with four columns
 therm_htol_march<- data %>% 
   #filter(age_class %in% c("Building", "Mature")) %>% #no results for these two # didn't try yet
   filter(proj_2025 == "TT Hot")%>% 
   select(site_name, species, age_class, proj_2025, plant_nr, temp_exp, temp_exp_time, fv_fm_final)
+
+#working
+```
+
+```{r}
+#| label:  concatenated columns, T50 curves and plots (age_class)
 
 # Create table with concatenated columns for naming
 united_columns_htol_march <- unite(
@@ -849,11 +855,7 @@ united_columns_htol_march <- unite(
 ) %>% 
   na.omit()
 
-#working
-```
-
-```{r}
-#| label: Calculate T50 curves (age_class)
+### T50 CURVES
 
 #install.packages("remotes")
 #remotes::install_github("richardjtelford/thermalTolerance")
@@ -871,36 +873,9 @@ TTHot_march_sum <- summary(TTHot_march) # see summary output for T50 values (not
 # no results for BUI and MAT --> maybe du to the weird curves we obtained earlyer
 
 autoplot(TTHot_march) # plots logistic curves and dashed lines for Tcrit, T50, T95
-```
 
-```{r}
-#| label: Calculate T50 curves per age_class with progression barre
-library(pbapply)
-install.packages("remotes")
-remotes::install_github("richardjtelford/thermalTolerance")
-library(thermalTolerance)
+### PLOT
 
-# definition of the progression scale
-pboptions(type = "timer", char = "=", style = 3)
-
-
-htol_list <- pblapply(split(united_columns_htol_march, united_columns_htol_march$new_id), function(df) {
-  psiiht(temperature = as.numeric(as.character(df$temp_exp)), 
-         warming = TRUE,
-         fvfm = as.numeric(as.character(df$fv_fm_final)),
-         control_temp = 20,
-         id = df$new_id,
-         boots = 500)
-})
-
-htol_DN_march_sum <- summary(htol_DN_march) # see summary output for T50 values (note, just means)
-# no results for BUI and MAT --> maybe du to the weird curves we obtained earlyer
-
-autoplot(htol_DN_march) # plots logistic curves and dashed lines for Tcrit, T50, T95
-```
-
-```{r}
-#| label: plots per age_class
 # Create a summary table that provides the median, standard error, and lower (2.5%) and upper (2.5%) quantiles for each ID and each thermal metric (T50, T95 and Tcrit)
 
 summarise_htol <- function(res, id) {
@@ -937,19 +912,19 @@ summarise_htol <- function(res, id) {
 }
 
 # Run the summarize function for each ID output
-DN_march_out <- Map(
+TTHot_march_out <- Map(
   summarise_htol, # function
-  htol_DN_march$results, # extract the results part of the psiiht output
-  names(htol_DN_march$results)  # extract the ID from the psiiht output
+  TTHot_march$results, # extract the results part of the psiiht output
+  names(TTHot_march$results)  # extract the ID from the psiiht output
   )
 #semble fonctionner
 
 # Create the dataframe by rowbinding 
-DN_thermal <- do.call(rbind, DN_march_out)
+TTHot_thermal <- do.call(rbind, TTHot_march_out)
 #on obtient un tableau
 
-# String split back to columns the ID
-DN_wide <- DN_thermal %>%
+# String split back to columns the ID, nouveau tableau
+TTHot_wide <- TTHot_thermal %>%
   separate_wider_delim(
     cols = id, # the column to split
     delim = "_", # how is the column seperated
@@ -970,7 +945,7 @@ DN_wide <- DN_thermal %>%
     age_class = factor(age_class, levels = c("Newly Burnt","Pioneer","Building", "Mature")))
 
 # Create a preliminary plot focusing on T50 metric
-DN_wide %>% 
+TTHot_wide %>% 
   filter(metric == "T50") %>% 
 ggplot(aes(x = age_class,
            y = estimate,
@@ -984,7 +959,7 @@ ggplot(aes(x = age_class,
   labs(
     x = "Age Class",
     y = "T50 (°C)",
-    color = "TT Hot",
+    color = "treatment",
     title = "T50 by Age Class for hot treatment",
     subtitle = "Points show mean bootstrap estimate; bars show ±1 SE"
   ) +
@@ -992,12 +967,12 @@ ggplot(aes(x = age_class,
 ```
 
 ```{r}
-#| label: table creation per plant
+#| label: concatenated columns, T50 curves and plots (per plant)
 
 
 # Create concatenated columns for naming
-united_columns_h_DN_plant <- unite(
-  DN_therm,
+united_columns_htol_march_plant <- unite(
+  therm_htol_march,
   col = "new_id",
   site_name, species, age_class, proj_2025, plant_nr,
   sep = "_",
@@ -1005,34 +980,28 @@ united_columns_h_DN_plant <- unite(
 ) %>% 
   na.omit()
 
-#working
-```
-
-```{r}
-#| label: Calculate T50 curves per plant
+### T50 CURVES
 
 #install.packages("remotes")
 #remotes::install_github("richardjtelford/thermalTolerance")
 #library(thermalTolerance)
 
-htol_DN_march_plant <- psiiht(temperature = as.numeric(as.character(united_columns_h_DN_plant$temp_exp)), 
+TTHot_march_plant <- psiiht(temperature = as.numeric(as.character(united_columns_htol_march_plant$temp_exp)), 
                warming = TRUE,
-               fvfm = as.numeric(as.character(united_columns_h_DN_plant$fv_fm_final)),
+               fvfm = as.numeric(as.character(united_columns_htol_march_plant$fv_fm_final)),
                control_temp = 20,
-               id = united_columns_h_DN_plant$new_id,
-               boots = 50)#boots can be higher when the script is working
+               id = united_columns_htol_march_plant$new_id,
+               boots = 100)#boots can be higher when the script is working
 
-htol_DN_march_plant_sum <- summary(htol_DN_march_plant) # see summary output for T50 values (note, just means)
+TTHot_march_plant_sum <- summary(TTHot_march_plant) # see summary output for T50 values (note, just means)
 # no results for BUI and MAT --> maybe du to the weird curves we obtained earlyer
 
-autoplot(htol_DN_march_plant) # plots logistic curves and dashed lines for Tcrit, T50, T95
+autoplot(TTHot_march_plant) # plots logistic curves and dashed lines for Tcrit, T50, T95
 
 #working, maybe separate the graph
 ## PROBLEME : je crois que ça run pour tout à chaque fois et pas seulement pour la plante concernéé (comparer htol_list et htol_list_plant)
-```
 
-```{r}
-#| label: plots per plant
+### PLOTS
 
 summarise_htol_plant <- function(res, id) {
   
@@ -1068,18 +1037,18 @@ summarise_htol_plant <- function(res, id) {
 }
 
 # Run the summarize function for each ID output
-DN_march_plant_out <- Map(
+TTHot_march_plant_out <- Map(
   summarise_htol_plant, # function
-  htol_DN_march_plant$results, # extract the results part of the psiiht output
-  names(htol_DN_march_plant$results)  # extract the ID from the psiiht output
+  TTHot_march_plant$results, # extract the results part of the psiiht output
+  names(TTHot_march_plant$results)  # extract the ID from the psiiht output
   )
 #semble fonctionner
 
 # Create the dataframe by rowbinding 
-DN_thermal_plant <- do.call(rbind, DN_march_plant_out)
+TTHot_thermal_plant <- do.call(rbind, TTHot_march_plant_out)
 
 # String split back to columns the ID
-DN_wide_plant <- DN_thermal_plant %>%
+TTHot_wide_plant <- TTHot_thermal_plant %>%
   separate_wider_delim(
     cols = id, # the column to split
     delim = "_", # how is the column seperated
@@ -1101,7 +1070,7 @@ DN_wide_plant <- DN_thermal_plant %>%
     age_class = factor(age_class, levels = c("Newly Burnt","Pioneer", "Building", "Mature")))
 
 # Create a preliminary plot focusing on T50 metric
-DN_wide_plant %>% 
+TTHot_wide_plant %>% 
   filter(metric == "T50") %>% 
 ggplot(aes(x = age_class,
            y = estimate,
@@ -1120,83 +1089,6 @@ ggplot(aes(x = age_class,
     subtitle = "Points show mean bootstrap estimate; bars show ±1 SE"
   ) +
   theme_bw()
-
-```
-
-```{r}
-###COPIE COLLE, A NETTOYER
-
-# Create a summary table that provides the median, standard error, and lower (2.5%) and upper (2.5%) quantiles for each ID and each thermal metric (T50, T95 and Tcrit)
-summarise_htol <- function(res, id) {
-  data.frame(
-    id = id,
-    metric = c("T50", "T95", "Tcrit"),
-    estimate = c(median(res$T50, na.rm = TRUE),
-                 median(res$T95, na.rm = TRUE),
-                 median(res$Tcrit, na.rm = TRUE)),
-    se = c(sd(res$T50, na.rm = TRUE),
-           sd(res$T95, na.rm = TRUE),
-           sd(res$Tcrit, na.rm = TRUE)),
-    lower = c(quantile(res$T50, 0.025, na.rm = TRUE),
-              quantile(res$T95, 0.025, na.rm = TRUE),
-              quantile(res$Tcrit, 0.025, na.rm = TRUE)),
-    upper = c(quantile(res$T50, 0.975, na.rm = TRUE),
-              quantile(res$T95, 0.975, na.rm = TRUE),
-              quantile(res$Tcrit, 0.975, na.rm = TRUE))
-  )
-}
-
-# Run the summarize function for each ID output
-# DroughtNet
-DN_out <- Map(
-  summarise_htol, # function
-  htol_DN$results, # extract the results part of the psiiht output
-  names(htol_DN$results)  # extract the ID from the psiiht output
-  )
-
-# Create the dataframe by rowbinding 
-DN_thermal <- do.call(rbind, DN_out)
-
-# String split back to columns the ID
-DN_wide <- DN_thermal %>%
-  separate_wider_delim(
-    cols = id, # the column to split
-    delim = "_", # how is the column seperated
-    # what should the new columns be called - do in order
-    names = c("siteID", "species", "age_class", "drought_treatmentID") #,
-   # too_many = "merge", # Merges any extra parts into the last column
-   # too_few = "align_start" # Fills missing values with NA
-  ) %>% 
-  # Check the data type of the new output columns and convert if necessary
-   mutate(
-    age_class = factor(age_class),
-    drought_treatmentID = factor(drought_treatmentID),
-    siteID = factor(siteID),
-    species = factor(species)
-  ) %>% 
-  # Relevel factors in natural order
-  mutate(
-    age_class = factor(age_class, levels = c("Pioneer", "Mature")),
-    drought_treatmentID = factor(drought_treatmentID, levels = c("AMB", "EXT")))
-
-# Create a preliminary plot focusing on T50 metric
-DN_wide %>% 
-  filter(metric == "T50") %>% 
-ggplot(aes(x = age_class,
-           y = estimate,
-           color = drought_treatmentID)) +
-  geom_point(size = 3,
-              position = position_dodge(width = 0.3)) +
-  geom_errorbar(aes(ymin = estimate - se, ymax = estimate + se),
-                width = 0.2,
-                position = position_dodge(width = 0.3)) +
-  facet_grid(siteID ~ species) +
-  labs(
-    x = "Age Class",
-    y = "T50 (°C)",
-    color = "Drought Treatment",
-    title = "T50 by Age Class and Drought Treatment",
-    subtitle = "Points show mean bootstrap estimate; bars show ±1 SE"
-  ) +
-  theme_bw()
+#working for 50 but not 500 ?
+#marche avec 100 mais les barres au niveau de la plante 5 s'agrandissent 
 ```
