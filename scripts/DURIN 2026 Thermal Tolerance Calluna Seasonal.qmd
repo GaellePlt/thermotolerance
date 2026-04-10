@@ -1098,28 +1098,6 @@ ggplot(aes(x = age_class,
 
 # Plant functional traits and T50
 
-(traits_T50_joint_wide %\>%
-
-ggplot(aes(x = as.numeric(as.character(SLA)), y = as.numeric(as.character(estimate)), colour = factor(plant_nr))) +
-
-geom_point(size = 2, alpha = 0.8,
-
-position = position_jitter(width = 0.15)) +
-
-facet_grid(.\~ age_class) +
-
-theme_bw() +
-
-labs(
-
-x = "SLA",
-
-y = "T50 estimate",
-
-title = "T50 by SLA per age class"
-
-))
-
 ```{r}
 #| label: influence of given traits on T50 (informal)
 # given plant functional traits : leaf area, dry mass, SLA, LDMC, height
@@ -1329,5 +1307,75 @@ traits_T50_joint_wide <- traits_T50_joint %>%
       y = "T50 estimate",
       title = "T50 by dry mass per age class"
     ))
+
+```
+
+```{r}
+#| label: régression linéaire multiple
+## régression linéaire multiple : sert à predire la T50 en fonction de pls variables (SLA, LDMC,...)
+
+# creation du modèle 
+T50_model = lm(formula = estimate ~ SLA + LDMC + height_flower + height_vegetative + dry_mass + leaf_area, data = traits_T50_joint_wide)
+summary(T50_model)
+
+## vérification de la normalité des residus
+T50_model_res = T50_model$residuals
+hist(T50_model_res) # histogramme asymétrique vers la gauche
+qqnorm(T50_model_res)
+qqline(T50_model_res) # Les points suivent la ligne --> normalité ok 
+
+## hypothèse de multicolinéarité
+install.packages("ggcorrplot")
+library(ggcorrplot)
+
+var_data_frame <- traits_T50_joint_wide %>%
+  select(height_flower, height_vegetative, dry_mass, leaf_area, SLA, LDMC)
+
+# matrice de corrélation bivariée
+corr_matrix = round(cor(var_data_frame), 2)
+# résultat
+ggcorrplot(corr_matrix, hc.order = TRUE, type = "lower",
+          lab = TRUE)
+# dry_mass et leaf_area : 0.81
+# height_flower et height_vegetative : 0.99
+# on enlève la height_flower car on s'intéresse aux feuilles
+# on envlève dry_mass et leaf_area car ils sont lié dans la SLA
+
+# création d'un nouveau modèle
+T50_model_2 = lm(formula = estimate ~ SLA + LDMC + height_vegetative, data = traits_T50_joint_wide)
+
+summary(T50_model_2) #seul le LDMC a une influence significative sur la T50
+
+## vérification de la normalité des residus
+T50_model_res = T50_model_2$residuals
+hist(T50_model_res) # histogramme asymétrique vers la gauche
+qqnorm(T50_model_res)
+qqline(T50_model_res) # Les points suivent la ligne --> normalité ok 
+
+## hypothèse de multicolinéarité
+install.packages("ggcorrplot")
+library(ggcorrplot)
+
+var_data_frame <- traits_T50_joint_wide %>%
+  select(height_vegetative, SLA, LDMC)
+
+# matrice de corrélation bivariée
+corr_matrix = round(cor(var_data_frame), 2)
+# résultat
+ggcorrplot(corr_matrix, hc.order = TRUE, type = "lower",
+          lab = TRUE)
+# normailté et corrélation ok après ces retraits 
+
+## --> quel modèle est le meilleur ?
+# vérification avec une ANOVA
+# H0 : les variables supprimées ne sont pas significatives
+# H1 : ces variables sont significatives
+
+# ANOVA test
+anova(T50_model, T50_model_2)
+# Même si model 1 est apparement mieux il y a multicolinéraité ce qui le fait bugger donc on prend le modèle 2
+```
+
+```{r}
 
 ```
