@@ -246,6 +246,10 @@ data <- data %>%
     #is.na(temp_exp) ~ "témoin",  # replace NA by "témoin"
     #TRUE ~ as.character(temp_exp)
   #))
+
+## missing value for NB7 leaf 16 (not correct in the raw data frame)
+data <- data %>%
+  mutate(wet_mass_g = if_else(is.na(wet_mass_g), 0.01063, wet_mass_g))
 ```
 
 # Calculate per leaf trait values
@@ -856,9 +860,9 @@ united_columns_htol_march <- unite(
 
 ### T50 CURVES
 
-#install.packages("remotes")
-#remotes::install_github("richardjtelford/thermalTolerance")
-#library(thermalTolerance)
+install.packages("remotes")
+remotes::install_github("richardjtelford/thermalTolerance")
+library(thermalTolerance)
 
 
 TTHot_march <- psiiht(temperature = as.numeric(as.character(united_columns_htol_march$temp_exp)), 
@@ -1094,9 +1098,136 @@ ggplot(aes(x = age_class,
 
 # Plant functional traits and T50
 
+(traits_T50_joint_wide %\>%
+
+ggplot(aes(x = as.numeric(as.character(SLA)), y = as.numeric(as.character(estimate)), colour = factor(plant_nr))) +
+
+geom_point(size = 2, alpha = 0.8,
+
+position = position_jitter(width = 0.15)) +
+
+facet_grid(.\~ age_class) +
+
+theme_bw() +
+
+labs(
+
+x = "SLA",
+
+y = "T50 estimate",
+
+title = "T50 by SLA per age class"
+
+))
+
 ```{r}
 #| label: influence of given traits on T50 (informal)
 # given plant functional traits : leaf area, dry mass, SLA, LDMC, height
 
-# --> création d'un nouveau tableau avec les traits et la T50 /!\ nombre de lignes 
+# Create data frame for the traits
+traits_data_frame <- data %>%
+  filter(proj_2025 == "Traits")%>% 
+  select(site_name, species, age_class, plant_nr, SLA, LDMC)
+# /!\ ligne 91 : NB7 has no LDMC --> all good
+
+traits_united_columns <- unite(
+  traits_data_frame,
+  col = "new_id",
+  site_name, species, age_class, plant_nr,
+  sep = "_",
+  remove = TRUE
+) %>% 
+  na.omit()
+
+# Create data frame with T50 for hot tolerance
+T50_data_frame <- TTHot_wide_plant %>%
+  filter(metric == "T50") %>%
+  select(site_name, species, age_class, plant_nr, estimate, se, lower, upper)
+
+T50_united_columns <- unite(
+  T50_data_frame,
+  col = "new_id",
+  site_name, species, age_class, plant_nr,
+  sep = "_",
+  remove = TRUE
+) %>% 
+  na.omit()
+
+# Create a joint data frame
+traits_T50_joint <- left_join(traits_united_columns, T50_united_columns, by = "new_id")
+
+# String split back to columns the ID
+traits_T50_joint_wide <- traits_T50_joint %>%
+  separate_wider_delim(
+    cols = new_id, # the column to split
+    delim = "_", # how is the column seperated
+    # what should the new columns be called - do in order
+    names = c("site_name", "species", "age_class", "plant_nr") #,
+   # too_many = "merge", # Merges any extra parts into the last column
+   # too_few = "align_start" # Fills missing values with NA
+  ) %>% 
+  # Check the data type of the new output columns and convert if necessary
+   mutate(
+    age_class = factor(age_class),
+    site_name = factor(site_name),
+    species = factor(species),
+    plant_nr = factor(plant_nr)
+  ) %>% 
+  # Relevel factors in natural order
+  mutate(
+    age_class = factor(age_class, levels = c("Newly Burnt","Pioneer", "Building", "Mature")))
+```
+
+```{r}
+#| label: T50 and SLA
+
+(traits_T50_joint_wide %>%
+    ggplot(aes(x = as.numeric(as.character(SLA)), y = as.numeric(as.character(estimate)), colour = factor(age_class))) + 
+    geom_point(size = 2, alpha = 0.8,
+             position = position_jitter(width = 0.15)) +
+    theme_bw() +
+    labs(
+      x = "SLA",
+      y = "T50 estimate",
+      title = "T50 by SLA per age class"
+    ))
+
+(traits_T50_joint_wide %>%
+    ggplot(aes(x = as.numeric(as.character(SLA)), y = as.numeric(as.character(estimate)), colour = factor(plant_nr))) + 
+    geom_point(size = 2, alpha = 0.8,
+             position = position_jitter(width = 0.15)) +
+    facet_grid(.~ age_class) +
+    theme_bw() +
+    labs(
+      x = "SLA",
+      y = "T50 estimate",
+      title = "T50 by SLA per age class"
+    ))
+```
+
+```{r}
+#| label: T50 and LDMC
+
+(traits_T50_joint_wide %>%
+    ggplot(aes(x = as.numeric(as.character(LDMC)), y = as.numeric(as.character(estimate)), colour = factor(age_class))) + 
+    geom_point(size = 2, alpha = 0.8,
+             position = position_jitter(width = 0.15)) +
+    theme_bw() +
+    labs(
+      x = "LDMC",
+      y = "T50 estimate",
+      title = "T50 by LDMC per age class"
+    ))
+
+(traits_T50_joint_wide %>%
+    ggplot(aes(x = as.numeric(as.character(LDMC)), y = as.numeric(as.character(estimate)), colour = factor(plant_nr))) + 
+    geom_point(size = 2, alpha = 0.8,
+             position = position_jitter(width = 0.15)) +
+    facet_grid(.~ age_class) +
+    theme_bw() +
+    labs(
+      x = "LDMC",
+      y = "T50 estimate",
+      title = "T50 by LDMC per age class"
+    ))
 ```
