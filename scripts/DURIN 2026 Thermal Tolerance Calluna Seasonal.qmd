@@ -1127,7 +1127,7 @@ title = "T50 by SLA per age class"
 # Create data frame for the traits
 traits_data_frame <- data %>%
   filter(proj_2025 == "Traits")%>% 
-  select(site_name, species, age_class, plant_nr, SLA, LDMC)
+  select(site_name, species, age_class, plant_nr, height_flower, height_vegetative, leaf_area, dry_mass, SLA, LDMC)
 # /!\ ligne 91 : NB7 has no LDMC --> all good
 
 traits_united_columns <- unite(
@@ -1230,4 +1230,104 @@ traits_T50_joint_wide <- traits_T50_joint %>%
       y = "T50 estimate",
       title = "T50 by LDMC per age class"
     ))
+```
+
+```{r}
+#| label: T50 and heights
+
+(traits_T50_joint_wide %>%
+    ggplot(aes(x = as.numeric(as.character(height_flower)), y = as.numeric(as.character(estimate)), colour = factor(age_class))) + 
+    geom_point() +
+    theme_bw() +
+    labs(
+      x = "flower height",
+      y = "T50 estimate",
+      title = "T50 by flower height per age class"
+    ))
+
+(traits_T50_joint_wide %>%
+    ggplot(aes(x = as.numeric(as.character(height_flower)), y = as.numeric(as.character(estimate)), colour = factor(plant_nr))) + 
+    geom_point() +
+    facet_grid(.~ age_class) +
+    theme_bw() +
+    labs(
+      x = "flower height",
+      y = "T50 estimate",
+      title = "T50 by flower height per age class"
+    ))
+
+(traits_T50_joint_wide %>%
+    ggplot(aes(x = as.numeric(as.character(height_vegetative)), y = as.numeric(as.character(estimate)), colour = factor(age_class))) + 
+    geom_point() +
+    theme_bw() +
+    labs(
+      x = "vegetative height",
+      y = "T50 estimate",
+      title = "T50 by vegetative height per age class"
+    ))
+
+(traits_T50_joint_wide %>%
+    ggplot(aes(x = as.numeric(as.character(height_vegetative)), y = as.numeric(as.character(estimate)), colour = factor(plant_nr))) + 
+    geom_point() +
+    facet_grid(.~ age_class) +
+    theme_bw() +
+    labs(
+      x = "vegetative height",
+      y = "T50 estimate",
+      title = "T50 by vegetative height per age class"
+    ))
+
+# /!\ je crois que les points se superposent
+```
+
+```{r}
+#| label: T50 and leaf area
+
+(traits_T50_joint_wide %>%
+    ggplot(aes(x = as.numeric(as.character(leaf_area)), y = as.numeric(as.character(estimate)), colour = factor(age_class))) + 
+    geom_point() +
+    theme_bw() +
+    labs(
+      x = "leaf area",
+      y = "T50 estimate",
+      title = "T50 by leaf area per age class"
+    ))
+
+(traits_T50_joint_wide %>%
+    ggplot(aes(x = as.numeric(as.character(leaf_area)), y = as.numeric(as.character(estimate)), colour = factor(plant_nr))) + 
+    geom_point() +
+    facet_grid(.~ age_class) +
+    theme_bw() +
+    labs(
+      x = "leaf area",
+      y = "T50 estimate",
+      title = "T50 by leaf area per age class"
+    ))
+
+```
+
+```{r}
+#| label: T50 and dry mass
+
+(traits_T50_joint_wide %>%
+    ggplot(aes(x = as.numeric(as.character(dry_mass)), y = as.numeric(as.character(estimate)), colour = factor(age_class))) + 
+    geom_point() +
+    theme_bw() +
+    labs(
+      x = "dry mass",
+      y = "T50 estimate",
+      title = "T50 by dry mass per age class"
+    ))
+
+(traits_T50_joint_wide %>%
+    ggplot(aes(x = as.numeric(as.character(dry_mass)), y = as.numeric(as.character(estimate)), colour = factor(plant_nr))) + 
+    geom_point() +
+    facet_grid(.~ age_class) +
+    theme_bw() +
+    labs(
+      x = "dry mass",
+      y = "T50 estimate",
+      title = "T50 by dry mass per age class"
+    ))
+
 ```
