@@ -1312,7 +1312,7 @@ traits_T50_joint_wide <- traits_T50_joint %>%
 
 ```{r}
 #| label: régression linéaire multiple
-## régression linéaire multiple : sert à predire la T50 en fonction de pls variables (SLA, LDMC,...)
+## régression linéaire multiple : sert à predire la T50 en fonction de pls variables (SLA, LDMC,...) /!\ on parle de données indep et ici elles ne le sont pas
 
 # creation du modèle 
 T50_model = lm(formula = estimate ~ SLA + LDMC + height_flower + height_vegetative + dry_mass + leaf_area, data = traits_T50_joint_wide)
@@ -1377,5 +1377,94 @@ anova(T50_model, T50_model_2)
 ```
 
 ```{r}
+#| label: Modèle Linéaire Mixte
 
+## /!\ hypothèses à vérifier pour une LMM
+
+# 1. normalité des résidus
+# 2. homoscédasticité
+# 3. indépendance des résidus
+# 4. normalité des effets aléatoires
+# 5. structure correcte des effets aléatoires
+# 6. absence de colinéarité (effets fixes)
+# 7. linéarité (effets fixes)
+# bonus. diagnostique de R
+
+install.packages("lme4")
+library(lme4)
+
+model_march_1 <- lmer(estimate ~ SLA + LDMC + height_flower + height_vegetative + dry_mass + leaf_area + age_class + (1 | plant_nr), data = traits_T50_joint_wide)
+
+summary(model_march_1)
+# /!\ colinéarité
+
+model_march_2 <- lmer(estimate ~ SLA + LDMC + height_flower + height_vegetative + age_class + (1 | plant_nr), data = traits_T50_joint_wide)
+
+summary(model_march_2)
+
+# 1.
+qqnorm(residuals(model_march_2)) 
+qqline(residuals(model_march_2)) # normalité des res ok
+
+# 2.
+plot(model_march_1) # les points sont aléatoires autour de la droite 0 --> homoscédasticité respectée + linéarité respectée (pas de forme de U)
+
+# 3.
+residus <- residuals(model_march_2)
+
+plot(residus, 
+     type = "b",
+     pch = 19, 
+     col = "steelblue",
+     main = "Indépendance des résidus",
+     xlab = "Index de l'observation",
+     ylab = "Résidus")
+abline(h = 0, lty = 2, col = "red") # Ajout d'une ligne à zéro
+
+acf(resid(model_march_2),
+    main = "ACF des résidus")
+# peut-être qu'il y a auto-corrélation je ne sais pas trop
+
+# 4.
+effets_aleatoires <- ranef(model_march_2)$plant_nr
+qqnorm(effets_aleatoires[, "(Intercept)"], 
+       main = "Normalité des effets aléatoires (Plantes)",
+       pch = 19, col = "darkgreen")
+qqline(effets_aleatoires[, "(Intercept)"], col = "red")
+# courbe un peu en forme de S --> normalité ~~
+
+# 5. 
+# On crée le modèle simple (sans effet aléatoire) avec lm()
+model_simple_2 <- lm(estimate ~ SLA + LDMC + height_flower + height_vegetative + age_class, 
+                   data = traits_T50_joint_wide)
+## AIC du LMM plus petit que LMS (différence de plus de 2 --> significatif)
+
+# On compare les deux modèles
+AIC(model_simple_2, model_march_2)
+# on vérifie la "singularité" (si le modèle a planté car trop complexe)
+isSingular(model_march_1) # FALSE --> ok 
+
+# 6. 
+install.packages("car")
+library(car)
+
+# Calcul du VIF (Variance Inflation Factor)
+vif(model_march_2)
+## il y a un pb --> à voir 
+
+# 7.
+install.packages("performance")
+install.packages("see") 
+library(performance)
+
+check_model(model_march_2, check = "linearity")
+# ok ?
+
+# bonus. 
+
+library(DHARMa)
+
+sim_res_calluna <- simulateResiduals(fittedModel = model_march_2)
+plot(sim_res_calluna)
+# ok?
 ```
