@@ -201,11 +201,16 @@ library(stringr)
 data <- data %>%
   mutate(remark = tolower(remark))%>% #evrything is in small letter to remove all capital letter mistakes
   mutate(remark = case_when(
+    age_class == "Building" & plant_nr == "1" & leaf_nr == "20" ~ paste(remark, "mostly brown", sep = "; "),
+    age_class == "Building" & plant_nr == "6" & leaf_nr == "18" ~ paste(remark, "brown leaves", sep = "; "),
+    age_class == "Newly Burnt" & plant_nr == "7" & leaf_nr == "16" & leaf_nr == "17" & leaf_nr == "18" & leaf_nr == "19" & leaf_nr == "20" ~ "partly brown leaves",
+    age_class == "Building" & plant_nr == "8" & leaf_nr == "16" & leaf_nr == "17" & leaf_nr == "18" & leaf_nr == "19" & leaf_nr == "20" ~ paste(remark, "brown leaves", sep = "; "),
     grepl("liquid", remark) ~ "liquid water in bag",
     grepl("fridge", remark) ~ "not removed from fridge, no balls",
     grepl("only", remark) ~ "3 leaves at scanning; mostly brown leaves; 3 leaves at thickness",
     TRUE ~ remark  # keeps all the other remarks the way they were
   ))
+  
 
 unique(data$remark)
 #ok? with 22 different comments
