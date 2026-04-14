@@ -1101,6 +1101,71 @@ ggplot(aes(x = age_class,
 #marche avec 200 mais les barres au niveau de la plante 5 et 4 s'agrandissent 
 ```
 
+```{r}
+#| label: effect of age_class on T50 (ANOVA)
+
+# Does the age_class has an effect on the T50 ?
+# H0 : age_class doesn't have an effect on T50 
+# H1 : age_class has an effect on T50
+
+# Create data frame 
+
+T50_TTHot <- TTHot_wide_plant %>%
+  filter(metric == "T50") %>%
+  select(site_name, species, age_class, plant_nr, estimate, se, lower, upper)%>%
+  mutate(unique_plantID = paste(age_class, plant_nr, sep = "_"))
+
+# we can't do a simple ANOVA (analyse of variance) because for the factor age_class with 4 modality (NB, PIO, BUI, MAT), we have 8 plantes fro each modality --> random effect. We have to do a Linear Mixed-Effects Models with age_class as a fixed effect and unique_plantID as a random effect.
+
+# LMM 
+
+library(lme4)
+library(lmerTest)
+
+model <- lmer(estimate ~ age_class, data = T50_TTHot)
+summary(model)
+
+model <- lmer(estimate ~ age_class +
+                
+              
+              data = T50_TTHot)
+
+names(T50_TTHot)
+
+summary(model)
+
+
+# Validation of hypothesis (LMM)
+
+# 1. normalité des résidus
+# 2. homoscédasticité
+# 3. indépendance des résidus
+# 4. normalité des effets aléatoires
+# 5. structure correcte des effets aléatoires
+# 6. absence de colinéarité (effets fixes)
+# 7. linéarité (effets fixes)
+# bonus. diagnostique de R
+
+# ... 
+
+# Anova of the model
+
+anova(model)
+
+## Validation of hypotheses (ANOVA)
+
+# Independance of observations
+
+
+# Homoscedasticity (Bartlett)
+bartlett.test(T50 ~ age_class, data = T50_TTHot) # if p-value > 0.05 --> hmoscedasticity ok
+
+# Normality of residuals (Shapiro-Wilk)
+shapiro.test(residuals(model_simple)) # if p-value > 0.05 --> normality ok
+plot(model_simple, which = 2)
+
+```
+
 # Plant functional traits and T50
 
 ```{r}
@@ -1159,6 +1224,19 @@ traits_T50_joint_wide <- traits_T50_joint %>%
   # Relevel factors in natural order
   mutate(
     age_class = factor(age_class, levels = c("Newly Burnt","Pioneer", "Building", "Mature")))
+
+
+names(traits_T50_joint_wide)
+
+data_scaled <- traits_T50_joint_wide %>%
+  mutate(
+    height_flower_sc = as.numeric(scale(height_flower)),
+    leaf_area_sc     = as.numeric(scale(leaf_area)),
+    dry_mass_sc      = as.numeric(scale(dry_mass)),
+    SLA_sc           = as.numeric(scale(SLA)),
+    LDMC_sc          = as.numeric(scale(LDMC)),
+     height_vegetative_sc = as.numeric(scale(height_vegetative)),
+  )
 ```
 
 ```{r}
@@ -1400,8 +1478,25 @@ library(lme4)
 
 model_march_1 <- lmer(estimate ~ SLA + LDMC + height_flower + height_vegetative + dry_mass + leaf_area + age_class + (1 | plant_nr), data = traits_T50_joint_wide)
 
+
+
+
 summary(model_march_1)
 # /!\ colinéarité
+
+
+summary(model_march_1)
+
+anova(model_march_1)
+
+view(data_scaled)
+
+apply(data_scaled[, 5:12], 2, var, na.rm=TRUE)
+
+cor_matrix <- cor(data_scaled[, 5:10], use = "complete.obs")
+print(cor_matrix)
+
+summary(model_march_1)
 
 model_march_2 <- lmer(estimate ~ SLA + LDMC + height_flower + height_vegetative + age_class + (1 | plant_nr), data = traits_T50_joint_wide)
 
