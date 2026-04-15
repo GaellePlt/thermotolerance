@@ -1125,16 +1125,6 @@ library(lmerTest)
 model <- lmer(estimate ~ age_class, data = T50_TTHot)
 summary(model)
 
-model <- lmer(estimate ~ age_class +
-                
-              
-              data = T50_TTHot)
-
-names(T50_TTHot)
-
-summary(model)
-
-
 # Validation of hypothesis (LMM)
 
 # 1. normalité des résidus
@@ -1478,25 +1468,9 @@ library(lme4)
 
 model_march_1 <- lmer(estimate ~ SLA + LDMC + height_flower + height_vegetative + dry_mass + leaf_area + age_class + (1 | plant_nr), data = traits_T50_joint_wide)
 
-
-
-
 summary(model_march_1)
 # /!\ colinéarité
 
-
-summary(model_march_1)
-
-anova(model_march_1)
-
-view(data_scaled)
-
-apply(data_scaled[, 5:12], 2, var, na.rm=TRUE)
-
-cor_matrix <- cor(data_scaled[, 5:10], use = "complete.obs")
-print(cor_matrix)
-
-summary(model_march_1)
 
 model_march_2 <- lmer(estimate ~ SLA + LDMC + height_flower + height_vegetative + age_class + (1 | plant_nr), data = traits_T50_joint_wide)
 
