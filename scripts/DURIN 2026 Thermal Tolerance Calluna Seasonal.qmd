@@ -1133,6 +1133,27 @@ plot(modele, which = 1) # Not sure
 shapiro.test(residuals(modele)) # if p-value > 0.05 --> normality ok
 plot(model, which = 2)
 
+# Graph
+boxplot(estimate ~ age_class, data = T50_TTHot, 
+        main = "age_class effect on T50",
+        ylab = "Estimate (T50)", 
+        col = c("lightblue", "orange", "lightgreen"))
+
+# no significatif difference between nb and pio but with mat yes (/!\ we only have one T50...)
+
+ggplot(T50_TTHot, aes(x = age_class, y = estimate, fill = age_class)) +
+  # Le violon (densité)
+  geom_violin(trim = FALSE, alpha = 0.5) + 
+  # Le boxplot à l'intérieur (plus fin)
+  geom_boxplot(width = 0.1, color = "black", outlier.shape = NA) +
+  # Optionnel : ajouter les points réels pour montrer l'échantillonnage
+  geom_jitter(width = 0.1, alpha = 0.5) +
+  # Cosmétique
+  theme_minimal() +
+  labs(title = "age_class effect on T50",
+       x = "age_class",
+       y = "Estimate T50") +
+  theme(legend.position = "none") # On enlève la légende si l'axe X suffit
 ```
 
 # Plant functional traits and T50
