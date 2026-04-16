@@ -1112,47 +1112,26 @@ ggplot(aes(x = age_class,
 
 T50_TTHot <- TTHot_wide_plant %>%
   filter(metric == "T50") %>%
-  select(site_name, species, age_class, plant_nr, estimate, se, lower, upper)%>%
-  mutate(unique_plantID = paste(age_class, plant_nr, sep = "_"))
+  select(site_name, species, age_class, plant_nr, estimate, se, lower, upper)
 
-# we can't do a simple ANOVA (analyse of variance) because for the factor age_class with 4 modality (NB, PIO, BUI, MAT), we have 8 plantes fro each modality --> random effect. We have to do a Linear Mixed-Effects Models with age_class as a fixed effect and unique_plantID as a random effect.
+# we can do a simple ANOVA (analyse of variance) because we only have one T50 per plant for each class
 
-# LMM 
+modele <- lm(estimate ~ age_class, data = T50_TTHot)
+summary(modele)
+anova(modele) # age_class has an effect on T50
 
-library(lme4)
-library(lmerTest)
-
-model <- lmer(estimate ~ age_class, data = T50_TTHot)
-summary(model)
-
-# Validation of hypothesis (LMM)
-
-# 1. normalité des résidus
-# 2. homoscédasticité
-# 3. indépendance des résidus
-# 4. normalité des effets aléatoires
-# 5. structure correcte des effets aléatoires
-# 6. absence de colinéarité (effets fixes)
-# 7. linéarité (effets fixes)
-# bonus. diagnostique de R
-
-# ... 
-
-# Anova of the model
-
-anova(model)
 
 ## Validation of hypotheses (ANOVA)
 
 # Independance of observations
+# Observations are independante
 
-
-# Homoscedasticity (Bartlett)
-bartlett.test(T50 ~ age_class, data = T50_TTHot) # if p-value > 0.05 --> hmoscedasticity ok
+# Homoscedasticity
+plot(modele, which = 1) # Not sure
 
 # Normality of residuals (Shapiro-Wilk)
-shapiro.test(residuals(model_simple)) # if p-value > 0.05 --> normality ok
-plot(model_simple, which = 2)
+shapiro.test(residuals(modele)) # if p-value > 0.05 --> normality ok
+plot(model, which = 2)
 
 ```
 
