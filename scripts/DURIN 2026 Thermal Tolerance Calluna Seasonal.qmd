@@ -1215,9 +1215,6 @@ traits_T50_joint_wide <- traits_T50_joint %>%
   mutate(
     age_class = factor(age_class, levels = c("Newly Burnt","Pioneer", "Building", "Mature")))
 
-
-names(traits_T50_joint_wide)
-
 data_scaled <- traits_T50_joint_wide %>%
   mutate(
     height_flower_sc = as.numeric(scale(height_flower)),
@@ -1225,7 +1222,7 @@ data_scaled <- traits_T50_joint_wide %>%
     dry_mass_sc      = as.numeric(scale(dry_mass)),
     SLA_sc           = as.numeric(scale(SLA)),
     LDMC_sc          = as.numeric(scale(LDMC)),
-     height_vegetative_sc = as.numeric(scale(height_vegetative)),
+    height_vegetative_sc = as.numeric(scale(height_vegetative)),
   )
 ```
 
@@ -1450,7 +1447,7 @@ data_scaled <- traits_T50_joint_wide %>%
 ```
 
 ```{r}
-#| label: Modèle Linéaire Mixte
+#| label: Lineare Mixed Model with Nested effects
 
 ## /!\ hypothèses à vérifier pour une LMM
 
@@ -1466,15 +1463,19 @@ data_scaled <- traits_T50_joint_wide %>%
 install.packages("lme4")
 library(lme4)
 
-model_march_1 <- lmer(estimate ~ SLA + LDMC + height_flower + height_vegetative + dry_mass + leaf_area + age_class + (1 | plant_nr), data = traits_T50_joint_wide)
+model_march <- lmer(estimate ~ age_class * (SLA_sc + LDMC_sc) + # Fixed effects: we want to know if age_class and traits have an effect on T50. * Traits vary throughout age_class, so they are dependent.
+        (1 | age_class:plant_nr), # Random effect: we have a random effect (plant_nr) nested within a fixed effect (age_class).
+        data = data_scaled)
+isSingular(model_march) # FALSE --> justify the random effect of plant_nr
 
-summary(model_march_1)
-# /!\ colinéarité
+summary(model_march)
+
+#not working...
 
 
-model_march_2 <- lmer(estimate ~ SLA + LDMC + height_flower + height_vegetative + age_class + (1 | plant_nr), data = traits_T50_joint_wide)
 
-summary(model_march_2)
+
+
 
 # 1.
 qqnorm(residuals(model_march_2)) 
@@ -1516,7 +1517,7 @@ model_simple_2 <- lm(estimate ~ SLA + LDMC + height_flower + height_vegetative +
 # On compare les deux modèles
 AIC(model_simple_2, model_march_2)
 # on vérifie la "singularité" (si le modèle a planté car trop complexe)
-isSingular(model_march_1) # FALSE --> ok 
+isSingular(model_march_1) # FALSE --> justify the random effect of plant_nr
 
 # 6. 
 install.packages("car")
