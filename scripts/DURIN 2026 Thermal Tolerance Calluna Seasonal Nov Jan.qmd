@@ -1,0 +1,439 @@
+---
+title: "DURIN 2026 Thermal Tolerance Calluna Seasonal Nov Jan"
+author: "Sonya R Geange and Gaëlle Poulat"
+format: html
+editor: visual
+---
+
+## Import Data
+
+```{r}
+#| label: loading libraries
+#| message: false 
+
+# installing / loading packages
+
+library(readxl) # Enables excel file import
+library(tidyverse) # Contains many helpful packages, i.e. dplyr etc.
+library(janitor) # Has tools for data cleaning 
+library(lubridate) # Date and time formatting
+library(readr) # Data importation functions
+library(stringr) # String and character text
+```
+
+```{r}
+#| label: importing raw data of trait and fluorescence
+#| message: false 
+
+# Eventually this will download from the DURIN OSF
+# For now, download the excel from google sheets and save in your projects 'raw_data' folder.
+# If using projects just need "./filenam.xlsx'
+# If not in projects, need full path name
+
+# Read in fluorescence and plant functional trait data (excluding leaf area)
+raw_data <- read_excel(
+  "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/Analyse statistique/thermotolerance/data/raw_data/Seasonal Calluna Thermal Tolerance and Plant Functional Traits.xlsx", 
+  sheet = "cv_nov25_jan26", # Choose the sheet from excel
+  na = c("", "NA")) # NAs are actually imported as NAs, not as characters 
+```
+
+```{r}
+#| label: clean trait dataset to match DURIN formatting
+
+
+# Change some column names to snake_case standard
+# Change any column names to match DURIN standards - some outlined here (https://github.com/Durin-project/Durin_data)
+# Some information will be specific to traits, fluorescence etc.
+# using slice() to remove the first three row of example data (ALWAYS CHECK!)
+
+raw_data <- raw_data %>% 
+  # New name then old name of column, including snake case ('_' and lower letters)
+  rename(site_name = siteID,
+         age_class = ageClass,
+         collection_time = CollTime,
+         paired_with = PairedWith,
+         temp_exp = TempExp,
+         temp_exp_time = TempExpTime,
+         temp_exp_time_unit = TempExpTimeUnit,
+         fv_fm_initial = 'Fv/Fm_Initial',
+         fv_fm_hr = 'Fv/Fm_Hr',
+         fv_fm_final = 'Fv/Fm_Final',
+         height_flower = 'height(s)_flower',
+         height_vegetative = 'height(s)_top',
+         treatment_date = TreatmentDate,
+         treatment_time = TreatmentTime) %>%  
+  slice(-(1:3)) # Remove first three rows (excluding headers)
+
+
+# Check variable types (character, numeric etc)
+glimpse(raw_data)
+
+# Changing classes of all variables that should be in class factor
+raw_data <- raw_data %>%  
+  mutate(across(c(site_name, species, proj_2025, project, age_class, plant_nr, leaf_age, sample, paired_with, calluna_shoot_type, temp_exp, temp_exp_time, temp_exp_time_unit, fv_fm_hr, scanned), as.factor))
+
+
+# Changing classes of variables that should be in class dbl/numeric
+raw_data <- raw_data |>
+    mutate(across(c(fv_fm_initial, fv_fm_final, wet_mass_g, leaf_thickness_1_mm, leaf_thickness_2_mm, leaf_thickness_3_mm, dry_mass_g, height_flower, height_vegetative), as.numeric))
+
+# Changing classes of all variables that should be in class integers
+raw_data <- raw_data |>
+    mutate(across(c(bulk_nr_leaves, leaf_nr), as.integer))
+
+# Recheck data types again
+glimpse(raw_data) 
+
+
+# Order relevant variables (useful for plotting and order based analyses)
+# age_class sorted from youngest to oldest
+
+raw_data$age_class <- factor((raw_data$age_class),
+                         levels = c("Newly Burnt", "Pioneer", 
+                                    "Building", "Mature"))
+# Check if changed successfully
+levels(raw_data$age_class)
+
+
+# Converting day, month, year column into one column on the format yyyy_mm_dd
+# Convert collection time into proeper time format
+# removing the day and year columns, keep month for data cleaning checking for now
+
+raw_data <- raw_data %>% 
+  mutate(date  = ymd_hm(paste(year, month, day,
+                 format(collection_time, format = "%H:%M"))), .after = 1)  %>% 
+  select(-c(day, year, collection_time)) 
+
+
+glimpse(raw_data) 
+
+# To help with plotting, make month an ordered factor (more useful one more months)
+raw_data <- raw_data %>%
+  mutate(month = factor(month, levels = c("November", "January", "March")))
+
+# Create a unique plant_ID given age_class, month, and plant_nr
+raw_data <- raw_data %>%   # assuming you already created Month/date_day earlier
+  mutate(
+    unique_plantID = paste(age_class, month, plant_nr, sep = "_")
+  )
+#ok!
+```
+
+```{r}
+#| label: import leaf area dataset tidy and match to trait dataset
+
+# None, I don't have it for those month
+
+```
+
+# Data Cleaning Entire Dataframe
+
+Above was cleaning of column names, formatting of variables etc. Now we need to identify any mistakes in the data entry, outliers etc.
+
+```{r}
+#| label: standardize comments and remarks
+
+# Find unique comments in the dataset
+unique(raw_data$remark)
+```
+
+# Check fluorescence outliers
+
+```{r}
+#| label: check fluorescence outliers
+(raw_data %>% 
+         filter(proj_2025 == "TT Hot") %>% 
+       ggplot(aes(x = as.numeric(as.character(temp_exp)), y = fv_fm_final, colour = factor(plant_nr))) +
+  geom_point(size = 2, alpha = 0.8,
+             position = position_jitter(width = 0.15)) +
+  facet_grid(age_class ~ month) +
+  theme_bw() +
+  labs(
+    x = "Temperature",
+    y = "fv_fm_final",
+    title = "Final fluorescence TT Hot by plant, age class and month"
+  ))
+
+raw_data %>% 
+  filter(proj_2025 == "TT Hot") %>% 
+  
+  ggplot(aes(x = as.numeric(as.character(temp_exp)), 
+             y = fv_fm_final,
+             group = plant_nr,      
+             color = plant_nr)) +
+  
+  geom_point(size = 2, alpha = 0.8,
+             position = position_jitter(width = 0.15)) +
+  geom_line() +
+
+  facet_grid(age_class ~ month) +
+  theme_bw() +
+  labs(
+    x = "Temperature",
+    y = "fv_fm_final",
+    title = "Fv/Fm response to hot temperature across plants, age classes and months"
+  )
+```
+
+# Hot T50 curves
+
+```{r}
+#| label: Create data frame
+
+# Create table with four columns
+therm_htol_novjan<- raw_data %>% 
+  #filter(age_class %in% c("Building", "Mature")) %>% #no results for these two # didn't try yet
+  filter(proj_2025 == "TT Hot")%>% 
+  select(site_name, species, age_class, proj_2025, plant_nr, temp_exp, temp_exp_time, fv_fm_final)
+```
+
+```{r}
+#| label:  concatenated columns, T50 curves and plots (age_class)
+
+# Create table with concatenated columns for naming
+united_columns_htol_novjan <- unite(
+  therm_htol_novjan,
+  col = "new_id",
+  site_name, species, age_class, proj_2025,
+  sep = "_",
+  remove = TRUE
+) %>% 
+  na.omit()
+
+### T50 CURVES per age_class
+
+install.packages("remotes")
+remotes::install_github("richardjtelford/thermalTolerance")
+library(thermalTolerance)
+
+
+TTHot_novjan <- psiiht(temperature = as.numeric(as.character(united_columns_htol_novjan$temp_exp)), 
+               warming = TRUE,
+               fvfm = as.numeric(as.character(united_columns_htol_novjan$fv_fm_final)),
+               control_temp = 20,
+               id = united_columns_htol_novjan$new_id,
+               boots = 5)#boots can be higher when the script is working
+
+TTHot_novjan_sum <- summary(TTHot_novjan) # see summary output for T50 values (note, just means)
+# no results for BUI and MAT --> maybe du to the weird curves we obtained earlyer
+
+autoplot(TTHot_novjan) # plots logistic curves and dashed lines for Tcrit, T50, T95
+
+### PLOT
+
+# Create a summary table that provides the median, standard error, and lower (2.5%) and upper (2.5%) quantiles for each ID and each thermal metric (T50, T95 and Tcrit)
+
+summarise_htol <- function(res, id) {
+  
+  # si c'est null on met des NA pour que ça ne bloque pas
+  if (is.null(res)) {
+    return(data.frame(
+      id = id,
+      metric = c("T50", "T95", "Tcrit"),
+      estimate = NA,
+      se = NA,
+      lower = NA,
+      upper = NA
+    ))
+  } 
+  
+  # sinon on calucule normalement
+  data.frame(
+    id = id,
+    metric = c("T50", "T95", "Tcrit"),
+    estimate = c(median(res$T50, na.rm = TRUE),
+                 median(res$T95, na.rm = TRUE),
+                 median(res$Tcrit, na.rm = TRUE)),
+    se = c(sd(res$T50, na.rm = TRUE),
+           sd(res$T95, na.rm = TRUE),
+           sd(res$Tcrit, na.rm = TRUE)),
+    lower = c(quantile(res$T50, 0.025, na.rm = TRUE),
+              quantile(res$T95, 0.025, na.rm = TRUE),
+              quantile(res$Tcrit, 0.025, na.rm = TRUE)),
+    upper = c(quantile(res$T50, 0.975, na.rm = TRUE),
+              quantile(res$T95, 0.975, na.rm = TRUE),
+              quantile(res$Tcrit, 0.975, na.rm = TRUE))
+  )
+}
+
+# Run the summarize function for each ID output
+TTHot_novjan_out <- Map(
+  summarise_htol, # function
+  TTHot_novjan$results, # extract the results part of the psiiht output
+  names(TTHot_novjan$results)  # extract the ID from the psiiht output
+  )
+#semble fonctionner
+
+# Create the dataframe by rowbinding 
+TTHot_thermal <- do.call(rbind, TTHot_novjan_out)
+#on obtient un tableau
+
+# String split back to columns the ID, nouveau tableau
+TTHot_wide <- TTHot_thermal %>%
+  separate_wider_delim(
+    cols = id, # the column to split
+    delim = "_", # how is the column seperated
+    # what should the new columns be called - do in order
+    names = c("site_name", "species", "age_class", "proj_2025") #,
+   # too_many = "merge", # Merges any extra parts into the last column
+   # too_few = "align_start" # Fills missing values with NA
+  ) %>% 
+  # Check the data type of the new output columns and convert if necessary
+   mutate(
+    age_class = factor(age_class),
+    proj_2025 = factor(proj_2025),
+    site_name = factor(site_name),
+    species = factor(species)
+  ) %>% 
+  # Relevel factors in natural order
+  mutate(
+    age_class = factor(age_class, levels = c("Newly Burnt","Pioneer","Building", "Mature")))
+
+# Create a preliminary plot focusing on T50 metric
+TTHot_wide %>% 
+  filter(metric == "T50") %>% 
+ggplot(aes(x = age_class,
+           y = estimate,
+           color = proj_2025)) +
+  geom_point(size = 3,
+              position = position_dodge(width = 0.3)) +
+  geom_errorbar(aes(ymin = estimate - se, ymax = estimate + se),
+                width = 0.2,
+                position = position_dodge(width = 0.3)) +
+  facet_grid(site_name ~ species) +
+  labs(
+    x = "Age Class",
+    y = "T50 (°C)",
+    color = "treatment",
+    title = "T50 by Age Class for hot treatment",
+    subtitle = "Points show mean bootstrap estimate; bars show ±1 SE"
+  ) +
+  theme_bw()
+```
+
+```{r}
+#| label: concatenated columns, T50 curves and plots (per plant)
+
+
+# Create concatenated columns for naming
+united_columns_htol_novjan_plant <- unite(
+  therm_htol_novjan,
+  col = "new_id",
+  site_name, species, age_class, proj_2025, plant_nr,
+  sep = "_",
+  remove = TRUE
+) %>% 
+  na.omit()
+
+### T50 CURVES
+
+#install.packages("remotes")
+#remotes::install_github("richardjtelford/thermalTolerance")
+#library(thermalTolerance)
+
+TTHot_novjan_plant <- psiiht(temperature = as.numeric(as.character(united_columns_htol_novjan_plant$temp_exp)), 
+               warming = TRUE,
+               fvfm = as.numeric(as.character(united_columns_htol_novjan_plant$fv_fm_final)),
+               control_temp = 20,
+               id = united_columns_htol_novjan_plant$new_id,
+               boots = 5)#boots can be higher when the script is working
+
+TTHot_novjan_plant_sum <- summary(TTHot_novjan_plant) # see summary output for T50 values (note, just means)
+# no results for BUI and MAT --> maybe du to the weird curves we obtained earlyer
+
+autoplot(TTHot_novjan_plant) # plots logistic curves and dashed lines for Tcrit, T50, T95
+
+#working, maybe separate the graph
+## PROBLEME : je crois que ça run pour tout à chaque fois et pas seulement pour la plante concernéé (comparer htol_list et htol_list_plant)
+
+### PLOTS
+
+summarise_htol_plant <- function(res, id) {
+  
+  # si c'est null on met des NA pour que ça ne bloque pas
+  if (is.null(res)) {
+    return(data.frame(
+      id = id,
+      metric = c("T50", "T95", "Tcrit"),
+      estimate = NA,
+      se = NA,
+      lower = NA,
+      upper = NA
+    ))
+  } 
+  
+  # sinon on calucule normalement
+  data.frame(
+    id = id,
+    metric = c("T50", "T95", "Tcrit"),
+    estimate = c(median(res$T50, na.rm = TRUE),
+                 median(res$T95, na.rm = TRUE),
+                 median(res$Tcrit, na.rm = TRUE)),
+    se = c(sd(res$T50, na.rm = TRUE),
+           sd(res$T95, na.rm = TRUE),
+           sd(res$Tcrit, na.rm = TRUE)),
+    lower = c(quantile(res$T50, 0.025, na.rm = TRUE),
+              quantile(res$T95, 0.025, na.rm = TRUE),
+              quantile(res$Tcrit, 0.025, na.rm = TRUE)),
+    upper = c(quantile(res$T50, 0.975, na.rm = TRUE),
+              quantile(res$T95, 0.975, na.rm = TRUE),
+              quantile(res$Tcrit, 0.975, na.rm = TRUE))
+  )
+}
+
+# Run the summarize function for each ID output
+TTHot_novjan_plant_out <- Map(
+  summarise_htol_plant, # function
+  TTHot_novjan_plant$results, # extract the results part of the psiiht output
+  names(TTHot_novjan_plant$results)  # extract the ID from the psiiht output
+  )
+#semble fonctionner
+
+# Create the dataframe by rowbinding 
+TTHot_thermal_plant <- do.call(rbind, TTHot_novjan_plant_out)
+
+# String split back to columns the ID
+TTHot_wide_plant <- TTHot_thermal_plant %>%
+  separate_wider_delim(
+    cols = id, # the column to split
+    delim = "_", # how is the column seperated
+    # what should the new columns be called - do in order
+    names = c("site_name", "species", "age_class", "proj_2025", "plant_nr") #,
+   # too_many = "merge", # Merges any extra parts into the last column
+   # too_few = "align_start" # Fills missing values with NA
+  ) %>% 
+  # Check the data type of the new output columns and convert if necessary
+   mutate(
+    age_class = factor(age_class),
+    proj_2025 = factor(proj_2025),
+    site_name = factor(site_name),
+    species = factor(species),
+    plant_nr = factor(plant_nr)
+  ) %>% 
+  # Relevel factors in natural order
+  mutate(
+    age_class = factor(age_class, levels = c("Newly Burnt","Pioneer", "Building", "Mature")))
+
+# Create a preliminary plot focusing on T50 metric
+TTHot_wide_plant %>% 
+  filter(metric == "T50") %>% 
+ggplot(aes(x = age_class,
+           y = estimate,
+           color = plant_nr)) +
+  geom_point(size = 2,
+              position = position_dodge(width = 0.6)) +
+  geom_errorbar(aes(ymin = estimate - se, ymax = estimate + se),
+                width = 0.2,
+                position = position_dodge(width = 0.6)) +
+  facet_grid(site_name~species) +
+  labs(
+    x = "Age Class",
+    y = "T50 (°C)",
+    color = "plant_nr",
+    title = "T50 for each plant for TT Hot by age class",
+    subtitle = "Points show mean bootstrap estimate; bars show ±1 SE"
+  ) +
+  theme_bw()
+#working for 50 but not 500 ?
+#marche avec 200 mais les barres au niveau de la plante 5 et 4 s'agrandissent 
+```
