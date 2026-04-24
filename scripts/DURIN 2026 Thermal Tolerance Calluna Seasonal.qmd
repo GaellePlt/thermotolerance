@@ -843,7 +843,7 @@ data %>%
 
 # Create table with four columns
 therm_htol_march<- data %>% 
-  #filter(age_class %in% c("Building", "Mature")) %>% #no results for these two # didn't try yet
+  filter(age_class %in% c("Newly Burnt", "Pioneer")) %>% # we don't keep MAT and BUI (first the curve on fv/fm response to TTHot are mostly lines around 0 ; second, we don't have any curve of T50 and estimate)
   filter(proj_2025 == "TT Hot")%>% 
   select(site_name, species, age_class, proj_2025, plant_nr, temp_exp, temp_exp_time, fv_fm_final)
 
@@ -999,7 +999,7 @@ TTHot_march_plant <- psiiht(temperature = as.numeric(as.character(united_columns
                fvfm = as.numeric(as.character(united_columns_htol_march_plant$fv_fm_final)),
                control_temp = 20,
                id = united_columns_htol_march_plant$new_id,
-               boots = 200)#boots can be higher when the script is working
+               boots = 500)#boots can be higher when the script is working
 
 TTHot_march_plant_sum <- summary(TTHot_march_plant) # see summary output for T50 values (note, just means)
 # no results for BUI and MAT --> maybe du to the weird curves we obtained earlyer
@@ -1112,7 +1112,6 @@ ggplot(aes(x = age_class,
 
 T50_TTHot <- TTHot_wide_plant %>%
   filter(metric == "T50") %>%
-  filter(age_class %in% c("Newly Burnt","Pioneer"))%>% # nouveau
   select(site_name, species, age_class, plant_nr, estimate, se, lower, upper)
 
 # we can do a simple ANOVA (analyse of variance) because we only have one T50 per plant for each class
@@ -1132,7 +1131,7 @@ plot(modele, which = 1) # Not sure
 
 # Normality of residuals (Shapiro-Wilk)
 shapiro.test(residuals(modele)) # if p-value > 0.05 --> normality ok
-plot(model, which = 2)
+plot(modele, which = 2)
 
 # Graph
 boxplot(estimate ~ age_class, data = T50_TTHot, 
@@ -1165,6 +1164,7 @@ ggplot(T50_TTHot, aes(x = age_class, y = estimate, fill = age_class)) +
 
 # Create data frame for the traits
 traits_data_frame <- data %>%
+  filter(age_class %in% c("Newly Burnt", "Pioneer")) %>% # we don't keep MAT and BUI (first the curve on fv/fm response to TTHot are mostly lines around 0 ; second, we don't have any curve of T50 and estimate)
   filter(proj_2025 == "Traits")%>% 
   select(site_name, species, age_class, plant_nr, height_flower, height_vegetative, leaf_area, dry_mass, SLA, LDMC)
 # /!\ ligne 91 : NB7 has no LDMC --> all good
