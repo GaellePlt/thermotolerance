@@ -1052,7 +1052,7 @@ TTHot_march_plant_out <- Map(
   )
 #semble fonctionner
 
-# Create the dataframe by rowbinding 
+# Create the dataframe by rowbinding
 TTHot_thermal_plant <- do.call(rbind, TTHot_march_plant_out)
 
 # String split back to columns the ID
@@ -1159,15 +1159,100 @@ ggplot(T50_TTHot, aes(x = age_class, y = estimate, fill = age_class)) +
 # Plant functional traits and T50
 
 ```{r}
-#| label: influence of given traits on T50 (informal)
-# given plant functional traits : leaf area, dry mass, SLA, LDMC, height
+# #| label: influence of given traits on T50 (informal)
+# # given plant functional traits : leaf area, dry mass, SLA, LDMC, height
+# 
+# # Create data frame for the traits
+# traits_data_frame <- data %>%
+#   filter(age_class %in% c("Newly Burnt", "Pioneer")) %>% # we don't keep MAT and BUI (first the curve on fv/fm response to TTHot are mostly lines around 0 ; second, we don't have any curve of T50 and estimate)
+#   filter(proj_2025 == "Traits")%>% 
+#   select(site_name, species, age_class, plant_nr, height_flower, height_vegetative, leaf_area, dry_mass, SLA, LDMC)
+# # /!\ ligne 91 : NB7 has no LDMC --> all good
+# 
+# traits_united_columns <- unite(
+#   traits_data_frame,
+#   col = "new_id",
+#   site_name, species, age_class, plant_nr,
+#   sep = "_",
+#   remove = TRUE
+# ) %>% 
+#   na.omit()
+# 
+# # Create data frame with T50 for hot tolerance
+# T50_data_frame <- TTHot_wide_plant %>%
+#   filter(metric == "T50") %>%
+#   select(site_name, species, age_class, plant_nr, estimate, se, lower, upper)
+# 
+# T50_united_columns <- unite(
+#   T50_data_frame,
+#   col = "new_id",
+#   site_name, species, age_class, plant_nr,
+#   sep = "_",
+#   remove = TRUE
+# ) %>% 
+#   na.omit()
+# 
+# # Create a joint data frame
+# traits_T50_joint <- left_join(traits_united_columns, T50_united_columns, by = "new_id")
+# 
+# # String split back to columns the ID
+# traits_T50_joint_wide <- traits_T50_joint %>%
+#   separate_wider_delim(
+#     cols = new_id, # the column to split
+#     delim = "_", # how is the column seperated
+#     # what should the new columns be called - do in order
+#     names = c("site_name", "species", "age_class", "plant_nr") #,
+#    # too_many = "merge", # Merges any extra parts into the last column
+#    # too_few = "align_start" # Fills missing values with NA
+#   ) %>% 
+#   # Check the data type of the new output columns and convert if necessary
+#    mutate(
+#     age_class = factor(age_class),
+#     site_name = factor(site_name),
+#     species = factor(species),
+#     plant_nr = factor(plant_nr)
+#   ) %>% 
+#   # Relevel factors in natural order
+#   mutate(
+#     age_class = factor(age_class, levels = c("Newly Burnt","Pioneer", "Building", "Mature")))
+# 
+# data_scaled <- traits_T50_joint_wide %>%
+#   mutate(
+#     height_flower_sc = as.numeric(scale(height_flower)),
+#     leaf_area_sc     = as.numeric(scale(leaf_area)),
+#     dry_mass_sc      = as.numeric(scale(dry_mass)),
+#     SLA_sc           = as.numeric(scale(SLA)),
+#     LDMC_sc          = as.numeric(scale(LDMC)),
+#     height_vegetative_sc = as.numeric(scale(height_vegetative)),
+#   )
+```
 
-# Create data frame for the traits
+```{r}
+#| label: short data frame (only one T50 per plant)
+
 traits_data_frame <- data %>%
   filter(age_class %in% c("Newly Burnt", "Pioneer")) %>% # we don't keep MAT and BUI (first the curve on fv/fm response to TTHot are mostly lines around 0 ; second, we don't have any curve of T50 and estimate)
-  filter(proj_2025 == "Traits")%>% 
-  select(site_name, species, age_class, plant_nr, height_flower, height_vegetative, leaf_area, dry_mass, SLA, LDMC)
-# /!\ ligne 91 : NB7 has no LDMC --> all good
+  filter(proj_2025 == "Traits" )%>% 
+  select(site_name, species, age_class, plant_nr, height_flower, height_vegetative, leaf_area, dry_mass, SLA, LDMC) %>%
+  group_by(site_name, species, age_class, plant_nr, height_flower, height_vegetative) %>%
+  summarise(
+    SLA_mean = mean(SLA, na.rm = TRUE),
+    SLA_min   = min(SLA, na.rm = TRUE),
+    SLA_max   = max(SLA, na.rm = TRUE),
+    
+    LDMC_mean = mean(LDMC, na.rm = TRUE),
+    LDMC_min   = min(LDMC, na.rm = TRUE),
+    LDMC_max   = max(LDMC, na.rm = TRUE),
+    
+    leaf_area_mean = mean(leaf_area, na.rm = TRUE),
+    leaf_area_min   = min(leaf_area, na.rm = TRUE),
+    leaf_area_max   = max(leaf_area, na.rm = TRUE),
+    
+    dry_mass_mean = mean(dry_mass, na.rm = TRUE),
+    dry_mass_min   = min(dry_mass, na.rm = TRUE),
+    dry_mass_max   = max(dry_mass, na.rm = TRUE),
+  )
+
 
 traits_united_columns <- unite(
   traits_data_frame,
@@ -1175,22 +1260,13 @@ traits_united_columns <- unite(
   site_name, species, age_class, plant_nr,
   sep = "_",
   remove = TRUE
-) %>% 
+) %>%
   na.omit()
 
 # Create data frame with T50 for hot tolerance
 T50_data_frame <- TTHot_wide_plant %>%
   filter(metric == "T50") %>%
   select(site_name, species, age_class, plant_nr, estimate, se, lower, upper)
-
-T50_united_columns <- unite(
-  T50_data_frame,
-  col = "new_id",
-  site_name, species, age_class, plant_nr,
-  sep = "_",
-  remove = TRUE
-) %>% 
-  na.omit()
 
 # Create a joint data frame
 traits_T50_joint <- left_join(traits_united_columns, T50_united_columns, by = "new_id")
@@ -1204,53 +1280,63 @@ traits_T50_joint_wide <- traits_T50_joint %>%
     names = c("site_name", "species", "age_class", "plant_nr") #,
    # too_many = "merge", # Merges any extra parts into the last column
    # too_few = "align_start" # Fills missing values with NA
-  ) %>% 
+  ) %>%
   # Check the data type of the new output columns and convert if necessary
    mutate(
     age_class = factor(age_class),
     site_name = factor(site_name),
     species = factor(species),
     plant_nr = factor(plant_nr)
-  ) %>% 
+  ) %>%
   # Relevel factors in natural order
   mutate(
-    age_class = factor(age_class, levels = c("Newly Burnt","Pioneer", "Building", "Mature")))
+    age_class = factor(age_class, levels = c("Newly Burnt","Pioneer")))
 
-data_scaled <- traits_T50_joint_wide %>%
-  mutate(
-    height_flower_sc = as.numeric(scale(height_flower)),
-    leaf_area_sc     = as.numeric(scale(leaf_area)),
-    dry_mass_sc      = as.numeric(scale(dry_mass)),
-    SLA_sc           = as.numeric(scale(SLA)),
-    LDMC_sc          = as.numeric(scale(LDMC)),
-    height_vegetative_sc = as.numeric(scale(height_vegetative)),
-  )
+# traits_T50_scaled <- traits_T50_joint_wide %>%
+#   mutate(
+#     height_flower_sc = as.numeric(scale(height_flower)),
+#     leaf_area_sc     = as.numeric(scale(leaf_area)),
+#     dry_mass_sc      = as.numeric(scale(dry_mass)),
+#     SLA_sc           = as.numeric(scale(SLA)),
+#     LDMC_sc          = as.numeric(scale(LDMC)),
+#     height_vegetative_sc = as.numeric(scale(height_vegetative)),
+#   )
 ```
 
 ```{r}
 #| label: T50 and SLA
 
 (traits_T50_joint_wide %>%
-    ggplot(aes(x = as.numeric(as.character(SLA)), y = as.numeric(as.character(estimate)), colour = factor(age_class))) + 
-    geom_point(size = 2, alpha = 0.8,
-             position = position_jitter(width = 0.15)) +
+    ggplot(aes(x = as.numeric(as.character(SLA_mean)), y = as.numeric(as.character(estimate)), colour = factor(age_class))) +
+    geom_errorbarh(aes(xmin = SLA_min, xmax = SLA_max), 
+                   height = 0.2, 
+                   alpha = 0.5) +
+    geom_point(size = 3) +
+    geom_smooth(method = "lm", se = FALSE, linewidth = 1) +
+    geom_smooth(aes(group = 1), 
+                method = "lm", 
+                color = "black", 
+                se = FALSE, 
+                size = 1.2) +
     theme_bw() +
     labs(
       x = "SLA",
       y = "T50 estimate",
-      title = "T50 by SLA per age class"
+      title = "T50 by SLA (mean) per age class"
     ))
 
 (traits_T50_joint_wide %>%
-    ggplot(aes(x = as.numeric(as.character(SLA)), y = as.numeric(as.character(estimate)), colour = factor(plant_nr))) + 
-    geom_point(size = 2, alpha = 0.8,
-             position = position_jitter(width = 0.15)) +
+    ggplot(aes(x = as.numeric(as.character(SLA_mean)), y = as.numeric(as.character(estimate)), colour = factor(plant_nr))) + 
+    geom_errorbarh(aes(xmin = SLA_min, xmax = SLA_max), 
+                   height = 0.2, 
+                   alpha = 0.5) +
+    geom_point(size = 3) +
     facet_grid(.~ age_class) +
     theme_bw() +
     labs(
       x = "SLA",
       y = "T50 estimate",
-      title = "T50 by SLA per age class"
+      title = "T50 by SLA (mean) per age class"
     ))
 ```
 
