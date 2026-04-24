@@ -336,7 +336,7 @@ TTHot_novjan_plant <- psiiht(temperature = as.numeric(as.character(united_column
                fvfm = as.numeric(as.character(united_columns_htol_novjan_plant$fv_fm_final)),
                control_temp = 20,
                id = united_columns_htol_novjan_plant$new_id,
-               boots = 5)#boots can be higher when the script is working
+               boots = 50)#boots can be higher when the script is working
 
 TTHot_novjan_plant_sum <- summary(TTHot_novjan_plant) # see summary output for T50 values (note, just means)
 # no results for BUI and MAT --> maybe du to the weird curves we obtained earlyer
