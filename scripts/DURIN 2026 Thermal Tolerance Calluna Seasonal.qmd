@@ -200,11 +200,20 @@ library(stringr)
 
 data <- data %>%
   mutate(remark = tolower(remark))%>% #evrything is in small letter to remove all capital letter mistakes
-  mutate(remark = case_when(
-    age_class == "Building" & plant_nr == "1" & leaf_nr == "20" ~ paste(remark, "mostly brown", sep = "; "),
-    age_class == "Building" & plant_nr == "6" & leaf_nr == "18" ~ paste(remark, "brown leaves", sep = "; "),
-    age_class == "Newly Burnt" & plant_nr == "7" & leaf_nr == "16" & leaf_nr == "17" & leaf_nr == "18" & leaf_nr == "19" & leaf_nr == "20" ~ "partly brown leaves",
-    age_class == "Building" & plant_nr == "8" & leaf_nr == "16" & leaf_nr == "17" & leaf_nr == "18" & leaf_nr == "19" & leaf_nr == "20" ~ paste(remark, "brown leaves", sep = "; "),
+  
+  mutate(scanning = case_when(
+    grepl("brown", remark) ~ paste(remark),
+  ))%>% #/!\ ne garder que la partie avec brown pour les commentaires plus long
+  
+  mutate(scanning = case_when(        
+    proj_2025 == "Traits" & age_class == "Building" & plant_nr == "1" & leaf_nr == "20" ~  "mostly brown leaves",
+    proj_2025 == "Traits" & age_class == "Building" & plant_nr == "6" & leaf_nr == "18" ~ "brown leaves",
+    proj_2025 == "Traits" & age_class == "Newly Burnt" & plant_nr == "7" ~ "partly brown leaves",
+    proj_2025 == "Traits" & age_class == "Building" & plant_nr == "8" ~ "brown leaves",
+    TRUE ~ scanning  # keeps all the other remarks the way they were
+    ))%>%
+  
+  mutate (remark = case_when(
     grepl("liquid", remark) ~ "liquid water in bag",
     grepl("fridge", remark) ~ "not removed from fridge, no balls",
     grepl("only", remark) ~ "3 leaves at scanning; mostly brown leaves; 3 leaves at thickness",
