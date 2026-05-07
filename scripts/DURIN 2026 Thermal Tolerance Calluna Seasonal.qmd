@@ -201,9 +201,14 @@ library(stringr)
 data <- data %>%
   mutate(remark = tolower(remark))%>% #evrything is in small letter to remove all capital letter mistakes
   
-  mutate(scanning = case_when(
-    grepl("brown", remark) ~ paste(remark),
-  ))%>% #/!\ ne garder que la partie avec brown pour les commentaires plus long
+  # mutate(scanning = case_when(
+  #   grepl("brown", remark) ~ paste(remark),
+  # ))%>% #/!\ ne garder que la partie avec brown pour les commentaires plus long
+  # 
+  mutate(
+    scanning = str_extract(remark, "[^;]*brown[^;]*"),
+    scanning = str_extract(remark, "[^;]*brown[^;]*") %>% str_trim()
+  )%>%
   
   mutate(scanning = case_when(        
     proj_2025 == "Traits" & age_class == "Building" & plant_nr == "1" & leaf_nr == "20" ~  "mostly brown leaves",
