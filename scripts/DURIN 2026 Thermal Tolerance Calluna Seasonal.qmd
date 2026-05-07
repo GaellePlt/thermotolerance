@@ -659,8 +659,6 @@ ggplot(data %>%  filter(proj_2025 == "Traits"),
 
 # Calculate SLA and LDMC
 
-#\| label: calculate SLA and LDMC
-
 ```{r}
 #| label: calculate SLA and LDMC
 
@@ -1200,7 +1198,7 @@ ggplot(T50_TTHot, aes(x = age_class, y = estimate, fill = age_class)) +
   theme(legend.position = "none") # On enlève la légende si l'axe X suffit
 ```
 
-# Plant functional traits and T50
+# Plant functional traits and T50 (Hot)
 
 ```{r}
 # #| label: influence of given traits on T50 (informal)
@@ -1272,7 +1270,7 @@ ggplot(T50_TTHot, aes(x = age_class, y = estimate, fill = age_class)) +
 ```
 
 ```{r}
-#| label: short data frame (only one T50 per plant)
+#| label: short data frame (one T50 per plant)
 
 traits_data_frame <- data %>%
   filter(age_class %in% c("Newly Burnt", "Pioneer")) %>% # we don't keep MAT and BUI (first the curve on fv/fm response to TTHot are mostly lines around 0 ; second, we don't have any curve of T50 and estimate)
@@ -1312,6 +1310,15 @@ T50_data_frame <- TTHot_wide_plant %>%
   filter(metric == "T50") %>%
   select(site_name, species, age_class, plant_nr, estimate, se, lower, upper)
 
+T50_united_columns <- unite(
+  T50_data_frame,
+  col = "new_id",
+  site_name, species, age_class, plant_nr,
+  sep = "_",
+  remove = TRUE
+) %>%
+  na.omit()
+
 # Create a joint data frame
 traits_T50_joint <- left_join(traits_united_columns, T50_united_columns, by = "new_id")
 
@@ -1336,13 +1343,23 @@ traits_T50_joint_wide <- traits_T50_joint %>%
   mutate(
     age_class = factor(age_class, levels = c("Newly Burnt","Pioneer")))
 
+# ### data frame scaled for the model --> /!\ varibles not used for the graphs yet
+# ## not working 
 # traits_T50_scaled <- traits_T50_joint_wide %>%
 #   mutate(
 #     height_flower_sc = as.numeric(scale(height_flower)),
-#     leaf_area_sc     = as.numeric(scale(leaf_area)),
-#     dry_mass_sc      = as.numeric(scale(dry_mass)),
-#     SLA_sc           = as.numeric(scale(SLA)),
-#     LDMC_sc          = as.numeric(scale(LDMC)),
+#     leaf_area_mean_sc     = as.numeric(scale(leaf_area_mean)),
+#     leaf_area_min_sc     = as.numeric(scale(leaf_area_min)),
+#     leaf_area_max_sc     = as.numeric(scale(leaf_area_max)),
+#     dry_mass_mean_sc      = as.numeric(scale(dry_mass_mean)),
+#     dry_mass_min_sc      = as.numeric(scale(dry_mass_min)),
+#     dry_mass_max_sc      = as.numeric(scale(dry_mass_max)),
+#     SLA_mean_sc           = as.numeric(scale(SLA_mean)),
+#     SLA_min_sc           = as.numeric(scale(SLA_min)),
+#     SLA_max_sc           = as.numeric(scale(SLA_max)),
+#     LDMC_mean_sc          = as.numeric(scale(LDMC_mean)),
+#     LDMC_min_sc          = as.numeric(scale(LDMC_min)),
+#     LDMC_max_sc          = as.numeric(scale(LDMC_max)),
 #     height_vegetative_sc = as.numeric(scale(height_vegetative)),
 #   )
 ```
@@ -1375,11 +1392,13 @@ traits_T50_joint_wide <- traits_T50_joint %>%
                    height = 0.2, 
                    alpha = 0.5) +
     geom_point(size = 3) +
+    scale_color_discrete(breaks = c("1", "2", "3", "4", "5", "6", "7", "8")) +
     facet_grid(.~ age_class) +
     theme_bw() +
     labs(
       x = "SLA",
       y = "T50 estimate",
+      color = "plant_nr",
       title = "T50 by SLA (mean) per age class"
     ))
 ```
@@ -1388,26 +1407,38 @@ traits_T50_joint_wide <- traits_T50_joint %>%
 #| label: T50 and LDMC
 
 (traits_T50_joint_wide %>%
-    ggplot(aes(x = as.numeric(as.character(LDMC)), y = as.numeric(as.character(estimate)), colour = factor(age_class))) + 
-    geom_point(size = 2, alpha = 0.8,
-             position = position_jitter(width = 0.15)) +
+    ggplot(aes(x = as.numeric(as.character(LDMC_mean)), y = as.numeric(as.character(estimate)), colour = factor(age_class))) +
+    geom_errorbarh(aes(xmin = LDMC_min, xmax = LDMC_max), 
+                   height = 0.2, 
+                   alpha = 0.5) +
+    geom_point(size = 3) +
+    geom_smooth(method = "lm", se = FALSE, linewidth = 1) +
+    geom_smooth(aes(group = 1), 
+                method = "lm", 
+                color = "black", 
+                se = FALSE, 
+                size = 1.2) +
     theme_bw() +
     labs(
       x = "LDMC",
       y = "T50 estimate",
-      title = "T50 by LDMC per age class"
+      title = "T50 by LDMC (mean) per age class"
     ))
 
 (traits_T50_joint_wide %>%
-    ggplot(aes(x = as.numeric(as.character(LDMC)), y = as.numeric(as.character(estimate)), colour = factor(plant_nr))) + 
-    geom_point(size = 2, alpha = 0.8,
-             position = position_jitter(width = 0.15)) +
+    ggplot(aes(x = as.numeric(as.character(LDMC_mean)), y = as.numeric(as.character(estimate)), colour = factor(plant_nr))) + 
+    geom_errorbarh(aes(xmin = LDMC_min, xmax = LDMC_max), 
+                   height = 0.2, 
+                   alpha = 0.5) +
+    scale_color_discrete(breaks = c("1", "2", "3", "4", "5", "6", "7", "8")) +
+    geom_point(size = 3) +
     facet_grid(.~ age_class) +
     theme_bw() +
     labs(
       x = "LDMC",
       y = "T50 estimate",
-      title = "T50 by LDMC per age class"
+      color = "plant_nr",
+      title = "T50 by LDMC (mean) per age class"
     ))
 ```
 
@@ -1417,42 +1448,50 @@ traits_T50_joint_wide <- traits_T50_joint %>%
 (traits_T50_joint_wide %>%
     ggplot(aes(x = as.numeric(as.character(height_flower)), y = as.numeric(as.character(estimate)), colour = factor(age_class))) + 
     geom_point() +
+    scale_color_discrete(breaks = c("1", "2", "3", "4", "5", "6", "7", "8")) +
     theme_bw() +
     labs(
       x = "flower height",
       y = "T50 estimate",
+      color = "plant_nr",
       title = "T50 by flower height per age class"
     ))
 
 (traits_T50_joint_wide %>%
     ggplot(aes(x = as.numeric(as.character(height_flower)), y = as.numeric(as.character(estimate)), colour = factor(plant_nr))) + 
     geom_point() +
+    scale_color_discrete(breaks = c("1", "2", "3", "4", "5", "6", "7", "8")) +
     facet_grid(.~ age_class) +
     theme_bw() +
     labs(
       x = "flower height",
       y = "T50 estimate",
+      color = "plant_nr",
       title = "T50 by flower height per age class"
     ))
 
 (traits_T50_joint_wide %>%
     ggplot(aes(x = as.numeric(as.character(height_vegetative)), y = as.numeric(as.character(estimate)), colour = factor(age_class))) + 
     geom_point() +
+    scale_color_discrete(breaks = c("1", "2", "3", "4", "5", "6", "7", "8")) +
     theme_bw() +
     labs(
       x = "vegetative height",
       y = "T50 estimate",
+      color = "plant_nr",
       title = "T50 by vegetative height per age class"
     ))
 
 (traits_T50_joint_wide %>%
     ggplot(aes(x = as.numeric(as.character(height_vegetative)), y = as.numeric(as.character(estimate)), colour = factor(plant_nr))) + 
     geom_point() +
+    scale_color_discrete(breaks = c("1", "2", "3", "4", "5", "6", "7", "8")) +
     facet_grid(.~ age_class) +
     theme_bw() +
     labs(
       x = "vegetative height",
       y = "T50 estimate",
+      color = "plant_nr",
       title = "T50 by vegetative height per age class"
     ))
 
@@ -1462,53 +1501,80 @@ traits_T50_joint_wide <- traits_T50_joint %>%
 ```{r}
 #| label: T50 and leaf area
 
+
 (traits_T50_joint_wide %>%
-    ggplot(aes(x = as.numeric(as.character(leaf_area)), y = as.numeric(as.character(estimate)), colour = factor(age_class))) + 
-    geom_point() +
+    ggplot(aes(x = as.numeric(as.character(leaf_area_mean)), y = as.numeric(as.character(estimate)), colour = factor(age_class))) +
+    geom_errorbarh(aes(xmin = leaf_area_min, xmax = leaf_area_max), 
+                   height = 0.2, 
+                   alpha = 0.5) +
+    geom_point(size = 3) +
+    geom_smooth(method = "lm", se = FALSE, linewidth = 1) +
+    geom_smooth(aes(group = 1), 
+                method = "lm", 
+                color = "black", 
+                se = FALSE, 
+                size = 1.2) +
     theme_bw() +
     labs(
-      x = "leaf area",
+      x = "leaf_area",
       y = "T50 estimate",
-      title = "T50 by leaf area per age class"
+      title = "T50 by leaf_area (mean) per age class"
     ))
 
 (traits_T50_joint_wide %>%
-    ggplot(aes(x = as.numeric(as.character(leaf_area)), y = as.numeric(as.character(estimate)), colour = factor(plant_nr))) + 
-    geom_point() +
+    ggplot(aes(x = as.numeric(as.character(leaf_area_mean)), y = as.numeric(as.character(estimate)), colour = factor(plant_nr))) + 
+    geom_errorbarh(aes(xmin = leaf_area_min, xmax = leaf_area_max), 
+                   height = 0.2, 
+                   alpha = 0.5) +
+    scale_color_discrete(breaks = c("1", "2", "3", "4", "5", "6", "7", "8")) +
+    geom_point(size = 3) +
     facet_grid(.~ age_class) +
     theme_bw() +
     labs(
-      x = "leaf area",
+      x = "leaf_area",
       y = "T50 estimate",
-      title = "T50 by leaf area per age class"
+      color = "plant_nr",
+      title = "T50 by leaf_area (mean) per age class"
     ))
-
 ```
 
 ```{r}
 #| label: T50 and dry mass
 
 (traits_T50_joint_wide %>%
-    ggplot(aes(x = as.numeric(as.character(dry_mass)), y = as.numeric(as.character(estimate)), colour = factor(age_class))) + 
-    geom_point() +
+    ggplot(aes(x = as.numeric(as.character(dry_mass_mean)), y = as.numeric(as.character(estimate)), colour = factor(age_class))) +
+    geom_errorbarh(aes(xmin = dry_mass_min, xmax = dry_mass_max), 
+                   height = 0.2, 
+                   alpha = 0.5) +
+    geom_point(size = 3) +
+    geom_smooth(method = "lm", se = FALSE, linewidth = 1) +
+    geom_smooth(aes(group = 1), 
+                method = "lm", 
+                color = "black", 
+                se = FALSE, 
+                size = 1.2) +
     theme_bw() +
     labs(
-      x = "dry mass",
+      x = "dry_mass",
       y = "T50 estimate",
-      title = "T50 by dry mass per age class"
+      title = "T50 by dry_mass (mean) per age class"
     ))
 
 (traits_T50_joint_wide %>%
-    ggplot(aes(x = as.numeric(as.character(dry_mass)), y = as.numeric(as.character(estimate)), colour = factor(plant_nr))) + 
-    geom_point() +
+    ggplot(aes(x = as.numeric(as.character(dry_mass_mean)), y = as.numeric(as.character(estimate)), colour = factor(plant_nr))) + 
+    geom_errorbarh(aes(xmin = dry_mass_min, xmax = dry_mass_max), 
+                   height = 0.2, 
+                   alpha = 0.5) +
+    scale_color_discrete(breaks = c("1", "2", "3", "4", "5", "6", "7", "8")) +
+    geom_point(size = 3) +
     facet_grid(.~ age_class) +
     theme_bw() +
     labs(
-      x = "dry mass",
+      x = "dry_mass",
       y = "T50 estimate",
-      title = "T50 by dry mass per age class"
+      color = "plant_nr",
+      title = "T50 by dry_mass (mean) per age class"
     ))
-
 ```
 
 ```{r}
@@ -1594,6 +1660,13 @@ traits_T50_joint_wide <- traits_T50_joint %>%
 install.packages("lme4")
 library(lme4)
 
+model_march_1 <- lmer(estimate ~ age_class * (SLA_mean + LDMC_mean + dry_mass_mean + height_vegetative + height_flower + leaf_area_mean) + # Fixed effects: we want to know if age_class and traits have an effect on T50. * Traits vary throughout age_class, so they are dependent.
+        (1 | age_class:plant_nr), # Random effect: we have a random effect (plant_nr) nested within a fixed effect (age_class).
+        data = traits_T50_joint_wide)
+
+
+
+
 model_march <- lmer(estimate ~ age_class * (SLA_sc + LDMC_sc) + # Fixed effects: we want to know if age_class and traits have an effect on T50. * Traits vary throughout age_class, so they are dependent.
         (1 | age_class:plant_nr), # Random effect: we have a random effect (plant_nr) nested within a fixed effect (age_class).
         data = data_scaled)
@@ -1673,4 +1746,52 @@ library(DHARMa)
 sim_res_calluna <- simulateResiduals(fittedModel = model_march_2)
 plot(sim_res_calluna)
 # ok?
+```
+
+```{r}
+#| label: 6. Absence of collinearity (fixed effects) # overall
+
+install.packages("ggcorrplot")
+library(ggcorrplot)
+
+# var_data_frame <- traits_T50_joint_wide %>%
+#   select(height_flower, height_vegetative, dry_mass_mean, leaf_area_mean, SLA_mean, LDMC_mean)
+
+var_data_frame <- traits_T50_joint_wide %>%
+  ungroup() %>%
+  select(height_vegetative, SLA_mean, LDMC_mean)
+
+# above 0.8 --> correlation between variables
+# dry_mass et leaf_area : 0.85
+# height_flower et height_vegetative : 0.97
+# remove height_flower we a^focus on leaves
+# remove dry_mass and leaf_area because they are linked in SLA
+
+# Bivariate correlation matrix
+corr_matrix = round(cor(var_data_frame), 2)
+# results
+ggcorrplot(corr_matrix, hc.order = TRUE, type = "lower",
+          lab = TRUE)
+```
+
+```{r}
+#| label: 6. Absence of collinearity (fixed effects) # by age_class
+
+
+library(metan)
+
+df_corr <- traits_T50_joint_wide %>%
+  select(age_class, height_flower, height_vegetative, dry_mass_mean, leaf_area_mean, SLA_mean, LDMC_mean)
+
+df_corr %>%
+  group_by(age_class) %>%
+  corr_plot(height_flower, height_vegetative, dry_mass_mean, leaf_area_mean, SLA_mean, LDMC_mean)
+
+# df_corr <- traits_T50_joint_wide %>%
+#   ungroup() %>%
+#   select(age_class, height_vegetative, SLA_mean, LDMC_mean)
+
+df_corr %>%
+  group_by(age_class) %>%
+  corr_plot(height_vegetative, SLA_mean, LDMC_mean)
 ```
