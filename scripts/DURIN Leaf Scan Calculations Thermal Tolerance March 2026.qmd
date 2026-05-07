@@ -67,9 +67,6 @@ run.ij(
   trim.pixel.top = 1500,
   save.image = TRUE
 )
-
-
-
 ```
 
 # Calculate Lygra Thermal Tolerance Leaf Scans
