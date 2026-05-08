@@ -1,6 +1,6 @@
 ---
 title: "DURIN Leaf Scan Calculations"
-author: "Sonya R. Geange"
+author: "Sonya R. Geange, Gaëlle"
 format: html
 editor: visual
 ---
