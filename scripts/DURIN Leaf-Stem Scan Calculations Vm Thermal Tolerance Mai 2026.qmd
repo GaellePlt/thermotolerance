@@ -16,8 +16,10 @@ library(dplyr)
 
 ## Calculate Leaf Area
 
+/!\\ some of the stems disappear when the image is in black and white
+
 ```{r}
-#| label: Cuting the images to have only the leaf
+#| label: Cutting the images to have only the leaf
 
 library(magick)
 
@@ -106,12 +108,12 @@ loop.files <-  function(files) {
 #   save.image = TRUE
 # )
 
-# ### /!\ some of the stems disappear when the image is in black and white, carefull withe the shadow of the leaves that count as part of the leaf area
+# ### /!\ carefull withe the shadow of the leaves that count as part of the leaf area
 ```
 
 ```{r function_leaf_area}
 ###########################################################################
-#### Calculate leaf area for 2025-2026 DURIN Calluna Leaf Scans thermal tolerance
+#### Calculate leaf area for 2025-2026 DURIN Vm Leaf Scans thermal tolerance
 # Make a list of files, temporary folder and output folder
 # Be sure to adjust the file path directory if required
 # These need to be downloaded from the OSF account. 
@@ -150,7 +152,132 @@ write.csv(leaf_area, file = "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/scans/Vm
 ## Calculate Old Stem Area
 
 ```{r}
+#| label: Cutting the images to have only the old stems
 
+library(magick)
+
+# files
+source_file <- "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/scans/Vm_april2026"
+dest_file   <- "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/scans/Vm_april2026/old_stem"
+
+# listing .jpeg files
+list_file <- list.files(source_file, 
+                             pattern = "(?i)\\.jpeg$", 
+                             full.names = TRUE)
+
+
+lapply(list_file, function(chemin) {
+  # reading
+  img <- image_read(chemin)
+  inf <- image_info(img)
+  
+  # cutting set up
+  top_cut <- 2200 
+  bottom_cut  <- 690
+  
+  # height calculation
+  final_height <- inf$height - top_cut - bottom_cut
+  
+  geometry <- paste0(inf$width, "x", final_height, "+0+", top_cut)
+  
+  # cutting
+  cut_img <- image_crop(img, geometry)
+  
+  # Sauvegarde
+  file_name <- basename(chemin)
+  image_write(cut_img, file.path(dest_file, file_name))
+})
+```
+
+```{r function_old_stem_area}
+#### Function to calculate old stems area 
+loop.files <-  function(files) {
+  file.copy(files, new.folder)
+  if (grepl("-NA$", files)) {
+    newfile <- basename(files)
+    file.rename(paste0(new.folder, "/", newfile),
+                paste0(new.folder,
+                       "/", gsub("-NA$", "", newfile)))
+  }
+  print(files)
+  area <-
+    try(run.ij(
+      path.imagej = "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/ImageJ",
+      set.directory = new.folder,
+      distance.pixel = 236,
+      known.distance = 2,
+      log = TRUE,
+      low.size = 0.05,
+      trim.pixel = 100,
+      trim.pixel.right = 250,
+      trim.pixel.top = 42, # removing the enveloppe
+      save.image = TRUE
+    ))
+  if (inherits(area, "try-error")) {
+    return(data.frame(LeafArea = NA))
+  }
+  file.copy(dir(new.folder, full.names = TRUE, pattern = "\\.tif"),
+            output.folder)
+  Sys.sleep(0.1)
+  if (any(!file.remove(dir(new.folder, full.names = TRUE))))
+    stop()
+  res <-
+    data.frame(ID = names(unlist(area[[2]])), LeafArea = (unlist(area[[2]])))
+  return(res)
+}
+
+
+# # If required
+# # test run.ij on a subfolder.
+# run.ij(
+#   path.imagej = "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/ImageJ",
+#   set.directory = "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/scans/Vm_april2026_test/old_stem",
+#   distance.pixel = 237,
+#   known.distance = 2,
+#   log = TRUE,
+#   low.size = 0.05,
+#   trim.pixel.right = 250,
+#   trim.pixel.top = 125,
+#   save.image = TRUE
+# )
+```
+
+```{r}
+###########################################################################
+#### Calculate leaf area for 2025-2026 DURIN Vm old stems Scans thermal tolerance
+# Make a list of files, temporary folder and output folder
+# Be sure to adjust the file path directory if required
+# These need to be downloaded from the OSF account. 
+# Note, each site has a folder and several subfolders.
+# Because of how often errors occur, run each folder seperately
+# Some images also required editing, i.e. painting overlapping leaves etc.
+# A default address could be 'raw_data/leaf_scans/DURIN_leaf_scans/
+
+# The folder with the scan images
+list.of.files <- dir(path = paste0("C:/Users/poula/Documents/M2_PAMEQ/Stage M2/scans/Vm_april2026/old_stem/"), pattern = "jpeg|jpg", recursive = TRUE, full.names = TRUE)
+# A default Temp folder that can be created as it's processing
+new.folder <- "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/scans/Vm_april2026/old_stem/Temp"
+# Where you want the thresholded images to be saved, and also the output csv
+output.folder <- "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/scans/Vm_april2026/old_stem/output_old_stem/" 
+
+# Run function
+# Returns a dataframe with each particle and it's area, using a concatenated ID
+LeafArea.raw_total <- plyr::ldply(list.of.files, loop.files)
+
+
+# calculate sums of the leaf area
+leaf_area <- LeafArea.raw_total |>
+  # Create and ID column based on the the first characters of the image file
+  mutate(ID = substr(ID, 1, 7)) |>
+  # Use the imageID to group the 'particles' leaves within
+  group_by(ID) |>
+  # Calculate per image, the number of particles and sum the areas of each
+  dplyr::summarise(n = n(),
+            old_stem_area = sum(LeafArea))
+
+# save data as csv
+dim(leaf_area) # check you have the correct number of rows to match input images
+write.csv(leaf_area, file = "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/scans/Vm_april2026/old_stem/output_old_stem/DURIN_Vm_old_stem_area_2026.csv")
 ```
 
 ## Calculate Young Stem Area
