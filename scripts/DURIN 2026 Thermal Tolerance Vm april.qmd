@@ -5,23 +5,34 @@ format: html
 editor: visual
 ---
 
-## Quarto
-
-Quarto enables you to weave together content and executable code into a finished document. To learn more about Quarto see <https://quarto.org>.
-
-## Running Code
-
-When you click the **Render** button a document will be generated that includes both content and the output of embedded code. You can embed code like this:
+## Import Data
 
 ```{r}
-1 + 1
-```
+#| label: loading libraries
+#| message: false 
 
-You can add options to executable code like this
+# installing / loading packages
+
+library(readxl) # Enables excel file import
+library(tidyverse) # Contains many helpful packages, i.e. dplyr etc.
+library(janitor) # Has tools for data cleaning 
+library(lubridate) # Date and time formatting
+library(readr) # Data importation functions
+library(stringr) # String and character text
+```
 
 ```{r}
-#| echo: false
-2 * 2
-```
+#| label: importing raw data of trait and fluorescence
+#| message: false 
 
-The `echo: false` option disables the printing of code (only output is displayed).
+# Eventually this will download from the DURIN OSF
+# For now, download the excel from google sheets and save in your projects 'raw_data' folder.
+# If using projects just need "./filenam.xlsx'
+# If not in projects, need full path name
+
+# Read in fluorescence and plant functional trait data (excluding leaf area)
+raw_data <- read_excel(
+  "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/Analyse statistique/thermotolerance/data/raw_data/Seasonal Calluna Thermal Tolerance and Plant Functional Traits.xlsx", 
+  sheet = "cv_mar26", # Choose the sheet from excel
+  na = c("", "NA")) # NAs are actually imported as NAs, not as characters 
+```
