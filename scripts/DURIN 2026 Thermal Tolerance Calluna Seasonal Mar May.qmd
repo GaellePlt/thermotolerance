@@ -5,23 +5,277 @@ format: html
 editor: visual
 ---
 
-## Quarto
-
-Quarto enables you to weave together content and executable code into a finished document. To learn more about Quarto see <https://quarto.org>.
-
-## Running Code
-
-When you click the **Render** button a document will be generated that includes both content and the output of embedded code. You can embed code like this:
+## Import Data
 
 ```{r}
-1 + 1
+#| label: loading libraries
+#| message: false 
+
+# installing / loading packages
+
+library(readxl) # Enables excel file import
+library(tidyverse) # Contains many helpful packages, i.e. dplyr etc.
+library(janitor) # Has tools for data cleaning 
+library(lubridate) # Date and time formatting
+library(readr) # Data importation functions
+library(stringr) # String and character text
 ```
 
-You can add options to executable code like this
+March data
 
 ```{r}
-#| echo: false
-2 * 2
+#| label: importing raw data of trait and fluorescence
+#| message: false 
+
+raw_data_mar <- read_excel(
+  "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/Analyse statistique/thermotolerance/data/raw_data/Seasonal Calluna Thermal Tolerance and Plant Functional Traits.xlsx", 
+  sheet = "cv_mar26", # Choose the sheet from excel
+  na = c("", "NA")) # NAs are actually imported as NAs, not as characters 
 ```
 
-The `echo: false` option disables the printing of code (only output is displayed).
+```{r}
+#| label: clean trait dataset to match DURIN formatting
+
+
+# Change some column names to snake_case standard
+# Change any column names to match DURIN standards - some outlined here (https://github.com/Durin-project/Durin_data)
+# Some information will be specific to traits, fluorescence etc.
+# using slice() to remove the first three row of example data (ALWAYS CHECK!)
+
+raw_data_mar <- raw_data_mar %>% 
+  # New name then old name of column, including snake case ('_' and lower letters)
+  rename(site_name = siteID,
+         age_class = ageClass,
+         collection_time = CollTime,
+         paired_with = PairedWith,
+         temp_exp = TempExp,
+         temp_exp_time = TempExpTime,
+         temp_exp_time_unit = TempExpTimeUnit,
+         fv_fm_initial = 'Fv/Fm_Initial',
+         fv_fm_hr = 'Fv/Fm_Hr',
+         fv_fm_final = 'Fv/Fm_Final',
+         height_flower = 'height(s)_flower',
+         height_vegetative = 'height(s)_top',
+         treatment_date = TreatmentDate,
+         treatment_time = TreatmentTime) %>%  
+  slice(-(1:3)) # Remove first three rows (excluding headers)
+
+
+# Check variable types (character, numeric etc)
+glimpse(raw_data_mar)
+
+# Changing classes of all variables that should be in class factor
+raw_data_mar <- raw_data_mar %>%  
+  mutate(across(c(site_name, species, proj_2025, project, age_class, plant_nr, leaf_age, sample, paired_with, calluna_shoot_type, temp_exp, temp_exp_time, temp_exp_time_unit, fv_fm_hr, scanned), as.factor))
+
+
+# Changing classes of variables that should be in class dbl/numeric
+raw_data_mar <- raw_data_mar |>
+    mutate(across(c(fv_fm_initial, fv_fm_final, wet_mass_g, leaf_thickness_1_mm, leaf_thickness_2_mm, leaf_thickness_3_mm, dry_mass_g, height_flower, height_vegetative), as.numeric))
+
+# Changing classes of all variables that should be in class integers
+raw_data_mar <- raw_data_mar |>
+    mutate(across(c(bulk_nr_leaves, leaf_nr), as.integer))
+
+# Recheck data types again
+glimpse(raw_data_mar) 
+
+
+# Order relevant variables (useful for plotting and order based analyses)
+# age_class sorted from youngest to oldest
+
+raw_data_mar$age_class <- factor((raw_data_mar$age_class),
+                         levels = c("Newly Burnt", "Pioneer", 
+                                    "Building", "Mature"))
+# Check if changed successfully
+levels(raw_data_mar$age_class)
+
+
+# Converting day, month, year column into one column on the format yyyy_mm_dd
+# Convert collection time into proeper time format
+# removing the day and year columns, keep month for data cleaning checking for now
+
+raw_data_mar <- raw_data_mar %>% 
+  mutate(date  = ymd_hm(paste(year, month, day,
+                 format(collection_time, format = "%H:%M"))), .after = 1)  %>% 
+  select(-c(day, year, collection_time)) 
+
+
+glimpse(raw_data_mar) 
+
+# To help with plotting, make month an ordered factor (more useful one more months)
+raw_data_mar <- raw_data_mar %>%
+  mutate(month = factor(month, levels = c("November", "January", "March")))
+
+# Create a unique plant_ID given age_class, month, and plant_nr
+raw_data_mar <- raw_data_mar %>%   # assuming you already created Month/date_day earlier
+  mutate(
+    unique_plantID = paste(age_class, month, plant_nr, sep = "_")
+  )%>% 
+  mutate(envelope_ID = case_when(
+    grepl("ADDX1933", envelope_ID) ~ "ADX1933",
+    grepl("AGS", envelope_ID) ~ "AGS4838",
+    TRUE ~ envelope_ID  # keeps all the other remarks the way they were
+    ))#wrong barcode written
+```
+
+May data
+
+```{r}
+#| label: importing raw data of trait and fluorescence
+#| message: false 
+
+raw_data_may <- read_excel(
+  "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/Analyse statistique/thermotolerance/data/raw_data/Seasonal Calluna Thermal Tolerance and Plant Functional Traits.xlsx", 
+  sheet = "cv_may26", # Choose the sheet from excel
+  na = c("", "NA")) # NAs are actually imported as NAs, not as characters 
+```
+
+```{r}
+#| label: clean trait dataset to match DURIN formatting
+
+
+# Change some column names to snake_case standard
+# Change any column names to match DURIN standards - some outlined here (https://github.com/Durin-project/Durin_data)
+# Some information will be specific to traits, fluorescence etc.
+# using slice() to remove the first three row of example data (ALWAYS CHECK!)
+
+raw_data_may <- raw_data_may %>% 
+  # New name then old name of column, including snake case ('_' and lower letters)
+  rename(site_name = siteID,
+         age_class = ageClass,
+         collection_time = CollTime,
+         paired_with = PairedWith,
+         temp_exp = TempExp,
+         temp_exp_time = TempExpTime,
+         temp_exp_time_unit = TempExpTimeUnit,
+         fv_fm_initial = 'Fv/Fm_Initial',
+         fv_fm_hr = 'Fv/Fm_Hr',
+         fv_fm_final = 'Fv/Fm_Final',
+         height_flower = 'height(s)_flower',
+         height_vegetative = 'height(s)_top',
+         treatment_date = TreatmentDate,
+         treatment_time = TreatmentTime) %>%  
+  slice(-(1:3)) # Remove first three rows (excluding headers)
+
+
+# Check variable types (character, numeric etc)
+glimpse(raw_data_may)
+
+# Changing classes of all variables that should be in class factor
+raw_data_may <- raw_data_may %>%  
+  mutate(across(c(site_name, species, proj_2025, project, age_class, plant_nr, leaf_age, sample, paired_with, calluna_shoot_type, temp_exp, temp_exp_time, temp_exp_time_unit, fv_fm_hr, scanned), as.factor))
+
+
+# Changing classes of variables that should be in class dbl/numeric
+raw_data_may <- raw_data_may |>
+    mutate(across(c(fv_fm_initial, fv_fm_final, wet_mass_g, leaf_thickness_1_mm, leaf_thickness_2_mm, leaf_thickness_3_mm, dry_mass_g, height_flower, height_vegetative), as.numeric))
+
+# Changing classes of all variables that should be in class integers
+raw_data_may <- raw_data_may |>
+    mutate(across(c(bulk_nr_leaves, leaf_nr), as.integer))
+
+# Recheck data types again
+glimpse(raw_data_may) 
+
+
+# Order relevant variables (useful for plotting and order based analyses)
+# age_class sorted from youngest to oldest
+
+raw_data_may$age_class <- factor((raw_data_may$age_class),
+                         levels = c("Newly Burnt", "Pioneer", 
+                                    "Building", "Mature"))
+# Check if changed successfully
+levels(raw_data_may$age_class)
+
+
+# Converting day, month, year column into one column on the format yyyy_mm_dd
+# Convert collection time into proeper time format
+# removing the day and year columns, keep month for data cleaning checking for now
+
+raw_data_may <- raw_data_may %>% 
+  mutate(date  = ymd_hm(paste(year, month, day,
+                 format(collection_time, format = "%H:%M"))), .after = 1)  %>% 
+  select(-c(day, year, collection_time)) 
+
+
+glimpse(raw_data_may) 
+
+# To help with plotting, make month an ordered factor (more useful one more months)
+raw_data_may <- raw_data_may %>%
+  mutate(month = factor(month, levels = c("November", "January", "March","May")))
+
+# Create a unique plant_ID given age_class, month, and plant_nr
+raw_data_may <- raw_data_may %>%   # assuming you already created Month/date_day earlier
+  mutate(
+    unique_plantID = paste(age_class, month, plant_nr, sep = "_")
+    )
+```
+
+Entire dataset
+
+```{r}
+#| label: Merge March date frame and May data frame
+
+raw_data <- bind_rows(raw_data_mar, raw_data_may)
+```
+
+Leaf area dataset
+
+```{r}
+#| label: import leaf area dataset tidy and match to trait dataset
+
+
+# Change this to your local repository where the four excel output files are stored
+leaf_area_dir <- "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/scans/cv_output/"
+
+# Import leaves from the directory where the files are saved, only .csv files, return the file paths (not just file names)
+leaf_area_raw <- list.files(leaf_area_dir, pattern = "\\.csv$", full.names = TRUE) %>%
+  # Give each element the name of the source file (remove directory path)
+  setNames(basename(.)) %>%
+  # Read each .csv file into R, combine into a single dataframe
+  # Add an ID column, indicating the source file
+  purrr::map_df(~ readr::read_csv(.x, show_col_types = FALSE), .id = "source_file")
+
+#leaf_area_raw has only 2 columnes and we have to separate them
+leaf_area_raw <- leaf_area_raw %>%
+  separate(
+    col =  `number;ID;n;leaf_area`,          # The column to separate
+    into = c("number", "ID", "n", "leaf_area"), # Names for the new columns
+    sep = ";",            # The delimiter to use for splitting
+  )%>%
+  #remove the column number
+  select(-c(number))
+
+# Clean and summarize files to get leaf area per envelopeID
+leaf_area_raw <- leaf_area_raw %>%
+  dplyr::select(-dplyr::matches("^Unnamed")) %>%   # drop index col if present
+  dplyr::mutate(
+    # Create new column names, and/or update the datatype for a given column
+    envelope_ID = str_trim(as.character(ID)),
+    leaf_area_scanned_bulk_nr = as.numeric(n),
+    leaf_area_sum = as.numeric(leaf_area)
+  ) %>%
+  # remove old column, comments is deleted as should be in the trait datasheet area check tab
+  select(-c(ID, n,leaf_area))
+
+
+
+
+# Choose correct value per envelope_ID based on the source file, i.e. edited or not
+leaf_area_clean <- leaf_area_raw %>% 
+  # Use the phrase 'edited_images' in the file name to prioritize
+  mutate(priority = if_else(str_detect(source_file, "edited_images"), 1, 2)) %>%  
+  arrange(envelope_ID, priority) %>%   # ordering so preferred rows come first
+  distinct(envelope_ID, .keep_all = TRUE) %>%   # keeping first row per ID
+  select(-priority) # removing helper column
+
+#ok! we have 165 enveloppes
+
+# Join the clean leaf area db to the main trait db by the envelope ID
+data <- raw_data %>%
+  dplyr::mutate(envelope_ID = stringr::str_trim(as.character(envelope_ID))) %>%
+  # Left join, keep values from x, and only matching rows in y (leaf_area_clean)
+  dplyr::left_join(leaf_area_clean, by = "envelope_ID")
+
+```
