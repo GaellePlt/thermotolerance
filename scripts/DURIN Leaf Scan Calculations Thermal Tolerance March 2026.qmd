@@ -83,11 +83,11 @@ run.ij(
 # A default address could be 'raw_data/leaf_scans/DURIN_leaf_scans/
 
 # The folder with the scan images
-list.of.files <- dir(path = paste0("C:/Users/poula/Documents/M2_PAMEQ/Stage M2/scans/calluna_may2026/"), pattern = "jpeg|jpg", recursive = TRUE, full.names = TRUE)
+list.of.files <- dir(path = paste0("C:/Users/poula/Documents/M2_PAMEQ/Stage M2/scans/calluna_may2026/edited_images/"), pattern = "jpeg|jpg", recursive = TRUE, full.names = TRUE)
 # A default Temp folder that can be created as it's processing
-new.folder <- "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/scans/calluna_may2026/Temp"
+new.folder <- "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/scans/calluna_may2026/edited_images/Temp"
 # Where you want the thresholded images to be saved, and also the output csv
-output.folder <- "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/scans/calluna_may2026/output/" 
+output.folder <- "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/scans/calluna_may2026/edited_images/output_edited_images/" 
 
 # Run function
 # Returns a dataframe with each particle and it's area, using a concatenated ID
@@ -106,5 +106,5 @@ leaf_area <- LeafArea.raw_total |>
 
 # save data as csv
 dim(leaf_area) # check you have the correct number of rows to match input images
-write.csv(leaf_area, file = "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/scans/calluna_may2026/output/DURIN_Calluna_leaf_area_may_2026.csv")
+write.csv(leaf_area, file = "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/scans/calluna_may2026/edited_images/output_edited_images/DURIN_Calluna_leaf_area_may_edited_images_2026.csv")
 ```
