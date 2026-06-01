@@ -209,7 +209,7 @@ data <- data %>%
   mutate(
     scanning = str_extract(remark, "[^;]*brown[^;]*"),
     scanning = str_extract(remark, "[^;]*brown[^;]*") %>% str_trim()
-  )%>
+  )%>%
   
   mutate(scanning = case_when(        
     proj_2025 == "Traits" & age_class == "Building" & plant_nr == "1" & leaf_nr == "20" ~  "mostly brown leaves",
