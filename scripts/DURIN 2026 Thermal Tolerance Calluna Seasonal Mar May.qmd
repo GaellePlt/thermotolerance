@@ -766,3 +766,86 @@ ggplot(data %>%  filter(proj_2025 == "Traits"),
 # accordig to the dry mass graph it as a higher dry mass than others and a higher wet mass too 
 
 ```
+
+# Calculate SLA and LDMC
+
+**Specific Leaf Area (SLA) :**
+
+SLA = Leaf Area (mm²) / Leaf dry mass (g)
+
+High SLA (\> 300 000 mm²/g) means fast-growing plants ("Acquisitive strategy"). These plants have thin, flexible leaves that capture light efficiently.
+
+Low SLA (\< 100 000 mm²/g) means slow-growing plants ("Conservative strategy"). These plants have thick, leathery leaves designed to last a long time and resist stress.
+
+**Leaf Dry Matter Content (LDMC) :**
+
+LDMC = Leaf Dry Mass (g)/ Leaf Fresh Mass (g)
+
+Varies between 0 and 1
+
+High LDMC (0.5 - 0.7) : Leaves are dense, high in lignin/cellulose, and low in water. They are very resistant to physical hazards and drought.
+
+Low LDMC (0;05 - 0.5) : Leaves are "succulent" or watery.
+
+```{r}
+#| label: calculate SLA and LDMC
+
+data <- data %>%  
+  mutate(
+    SLA = ifelse(
+      !is.na(leaf_area) & !is.na(dry_mass), # excluding rows with NAs
+      leaf_area / dry_mass, # Leaf level metrics
+      NA_real_
+    )
+  )
+
+data <- data %>% 
+  mutate(
+    LDMC = ifelse( # making new ldmc column
+      !is.na(dry_mass) & !is.na(wet_mass), # excluding rows with NAs
+      dry_mass / wet_mass, # Leaf level metrics
+      NA_real_
+    )
+  )
+```
+
+```{r}
+#| label: check SLA outliers (per leaf)
+
+# making a scatterplot for dry mass mean for trait leaves, plant_nr on x-axis and weight in g on y-axis
+ggplot(data %>%  filter(proj_2025 == "Traits"),
+       aes(x = factor(plant_nr), y = SLA, colour = factor(plant_nr))) +
+  geom_point(size = 2, alpha = 0.8,
+             position = position_jitter(width = 0.15)) +
+  facet_grid(age_class ~ month) +
+  theme_bw() +
+  labs(
+    x = "Plant number",
+    y = "SLA",
+    title = "Mean SLA per leaf by plant, age class and month"
+  )
+
+# higher SLA for NB than MAT --> ok 
+# high value for BUI 6 probably linked to the low value of dry mass
+# no weird value for MAT 6 even if low value for dry mass
+```
+
+```{r}
+#| label: check LDMC outliers (per leaf)
+
+# making a scatterplot for dry mass mean for trait leaves, plant_nr on x-axis and weight in g on y-axis
+ggplot(data %>%  filter(proj_2025 == "Traits"),
+       aes(x = factor(plant_nr), y = LDMC, colour = factor(plant_nr))) +
+  geom_point(size = 2, alpha = 0.8,
+             position = position_jitter(width = 0.15)) +
+  facet_grid(age_class ~ month) +
+  theme_bw() +
+  labs(
+    x = "Plant number",
+    y = "Leaf Dry Matter Content (LDMC)",
+    title = "Mean LDMC per leaf by plant, age class and month"
+  )
+
+# LDMC rise with the age of the plant --> ok because leaves from mature plant are more structured with lignine for example
+# weird value for BUI 6 and MAT 6 --> may be linked to the 2 low values in the graph of dry mass
+```
