@@ -340,33 +340,37 @@ unique(data$remark)
 ```{r}
 #| label: adjusting weird values in the data
 
-## MODIFICATION in the "check leaf thickness outliers (per measurement 1-3 replicates)" part
-# for BUI 8 20 leaf_thickness_3_mm is 0.588 instead of 0.249
+## March
 data <- data %>%
   mutate(leaf_thickness_3_mm = case_when(
-    grepl("0.588", leaf_thickness_3_mm) ~ 0.249,
+    grepl("AGT0463", envelope_ID) ~ 0.249,
     TRUE ~ leaf_thickness_3_mm
-  ))
-
-## month MODIFICATION
-data <- data %>%
+  )) %>%  #BUI 8 : 0.588 in data frame ; 0.249 on the envelope AGT0463
   mutate(month = case_when(
     grepl("January", month) ~ "March",
     TRUE ~ month
-  ))
+  )) %>%  #wrong month for PIO1 - leaf15
+  mutate(wet_mass_g = case_when(
+    grepl(NA, wet_mass_g) ~ 0.01063,
+    TRUE ~ wet_mass_g
+  )) #NB 7 : no value in data frame ; 0.01063 on the envelope AFN1989
 
-## temp_exp --> témoin
-#data <- data %>%
-  #mutate(temp_exp = case_when(
-    #is.na(temp_exp) ~ "témoin",  # replace NA by "témoin"
-    #TRUE ~ as.character(temp_exp)
-  #))
 
-## missing value for NB7 leaf 16 (not correct in the raw data frame)
+## May 
+# wet mass : 
 data <- data %>%
-  mutate(wet_mass_g = if_else(is.na(wet_mass_g), 0.01063, wet_mass_g))
-
-### NOT DONE FOR MAY
+  mutate(wet_mass_g = case_when(
+    grepl("AUX0977", envelope_ID) ~ 0.01069,
+    TRUE ~ wet_mass_g
+  )) %>%  #PIO 7 : 0.10690 in data frame ; 0.1069 on enveloppe AUX097--> pb with 5 decimals scale
+  mutate(wet_mass_g = case_when(
+    grepl("APP8997", envelope_ID) ~ 0.01449,
+    TRUE ~ wet_mass_g
+  )) %>%  #MAT 2 : 0.14490 in data frame ; 0.01449 on the envelope APP8997
+  mutate (dry_mass_g = case_when(
+    grepl("AOM6256", envelope_ID) ~ 0.00590,
+    TRUE ~ dry_mass_g
+  ))  #MAT 8 : 0.0590 in data frame ; 0.00590 on the enveloppe AOM6256
 ```
 
 # Calculate per leaf trait values
@@ -548,8 +552,7 @@ ggplot(data %>%  filter(proj_2025 == "Traits"),
   
   theme_bw()
 
-# vegetation height --> ok
-# flower height --> NB 7 without flowering height but ok
+## March : NB 7 without flowering height
 ```
 
 ```{r}
@@ -570,10 +573,15 @@ ggplot(data %>%  filter(proj_2025 == "Traits"),
   ))
 
 ## March
-# wet mass ok exept one for PIO 5 ~ 0.007
+# wet mass ok exept for :
+#           PIO 5 : 0.02825 in data frame ; 0.02825 on the envelope ACP1838
+#           NB 7 : no value in data frame ; 0.01063 on the envelope AFN1989
 
 ## May
-# wet mass ok except for PIO 7 and MAT 2 --> NOT modified yet 
+# wet mass ok except for :
+#           PIO 7 : 0.10690 in data frame ; 0.1069 on envelope AUX097--> pb with 5 decimal scale
+#           MAT 2 : 0.14490 in data frame ; 0.01449 on the envelope APP8997
+#           NB 7 : 0.05708 in data frame ; 0.05708 on the envelope AJD4636
 ```
 
 ```{r}
@@ -649,7 +657,6 @@ ggplot(data_long_thickness, #plotting drom long format
   )
 
 
-
 ggplot(data_long_thickness, #plotting drom long format
        aes(x = factor(plant_nr),
            y = leaf_thickness_mm,
@@ -664,10 +671,11 @@ ggplot(data_long_thickness, #plotting drom long format
     title = "Leaf thickness replicates by plant, age class and month"
   )
 
-# weird values to check : BUI 1 19 0.25 ; BUI 8 20 0.6
-# BUI 1 19 0.25 --> seems ok ; BUI 8 20 0.6 ; PIO 2 20 0.6
-# for BUI 8 20 leaf_thickness_3_mm is 0.588 instead of 0.249 --> modification code is "data cleaning entire frame"
-# other values are fine
+## March
+#         BUI 8 : 0.588 in data frame ; 0.249 on the envelope AGT0463
+
+## May, high value for :
+#           NB 4 - 16 young : 0.857 (thickness 1) in the data frame ; 0.857 on the enveloppe AJA9484
 ```
 
 ```{r}
@@ -689,7 +697,8 @@ ggplot(data |> filter(proj_2025 == "Traits"),
 # values seem ok ; may be PIO 5 values are a little bit higher than the others PIO
 # 2 low values for dry mass plant 6 for BUI and MAT
 
-## for May one MAT has a really heigh value
+## MAY, high value for :
+#               MAT 8 : 0.0590 in data frame ; 0.00590 on the enveloppe 
 ```
 
 ```{r}
@@ -756,5 +765,4 @@ ggplot(data %>%  filter(proj_2025 == "Traits"),
 # for PIO 5 values are isolated 
 # accordig to the dry mass graph it as a higher dry mass than others and a higher wet mass too 
 
-# weird values : MAT 8, MAT 2, PIO 7
 ```
