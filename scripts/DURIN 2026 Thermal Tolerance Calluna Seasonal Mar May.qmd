@@ -359,8 +359,8 @@ data <- data %>%
 
 
 ## May 
-# wet mass : 
 data <- data %>%
+## wet mass
   mutate(wet_mass_g = case_when(
     grepl("AUX0977", envelope_ID) ~ 0.01069,
     TRUE ~ wet_mass_g
@@ -369,10 +369,16 @@ data <- data %>%
     grepl("APP8997", envelope_ID) ~ 0.01449,
     TRUE ~ wet_mass_g
   )) %>%  #MAT 2 : 0.14490 in data frame ; 0.01449 on the envelope APP8997
-  mutate (dry_mass_g = case_when(
+  mutate(dry_mass_g = case_when(
     grepl("AOM6256", envelope_ID) ~ 0.00590,
     TRUE ~ dry_mass_g
-  ))  #MAT 8 : 0.0590 in data frame ; 0.00590 on the enveloppe AOM6256
+  )) %>%  #MAT 8 : 0.0590 in data frame ; 0.00590 on the enveloppe AOM6256
+## wrong month  
+  mutate(month = case_when(
+    month == "March" & proj_2025 == "TT Hot" & age_class == "Pioneer" & plant_nr == "6" & leaf_age == "old" & temp_exp == 38 & fv_fm_final == 0.12 ~ "May",
+    month == "March" & proj_2025 == "TT Hot" & age_class == "Pioneer" & plant_nr == "6" & leaf_age == "young" & temp_exp == 38 & fv_fm_final == 0.69 ~ "May",
+    TRUE ~ month
+  ))
 ```
 
 # Calculate per leaf trait values
@@ -935,7 +941,7 @@ data %>%
              position = position_jitter(width = 0.15)) +
   geom_line() +
 
-  facet_grid(age_class ~ month) + #leaf_age
+  facet_grid(age_class ~ month ~ leaf_age) + 
   theme_bw() +
   labs(
     x = "Temperature",
@@ -959,7 +965,7 @@ data %>%
              position = position_jitter(width = 0.15)) +
   geom_line() +
 
-  facet_grid(age_class ~ month) + #leaf_age
+  facet_grid(age_class ~ month ~ leaf_age) + 
   theme_bw() +
   labs(
     x = "Temperature",
@@ -971,5 +977,108 @@ data %>%
 # Hot T50 curves
 
 ```{r}
+#| label: Create data frame
+
+# Create table with four columns
+therm_htol<- data %>% 
+  filter(
+    !(month == "March" & age_class %in% c("Mature", "Building"))
+  ) %>% # We did not keep MAT and BUI in March because they were mainly initially dead (based on the Fv/Fm graph). Consequently, we could not obtain a T50 curve or a T50 estimation for those age classes.
+  
+  filter(proj_2025 == "TT Hot")%>% 
+  select(month, site_name, species, age_class, leaf_age, proj_2025, plant_nr, temp_exp, temp_exp_time, fv_fm_final)
+```
+
+```{r}
+#| label:  concatenated columns, T50 curves and plots (age_class)
+
+# Create table with concatenated columns for naming
+united_columns_htol <- unite(
+  therm_htol,
+  col = "new_id",
+  site_name, species, age_class, month, leaf_age, proj_2025,
+  sep = "_",
+  remove = TRUE
+) %>% 
+  na.omit()
+
+### T50 CURVES
+
+install.packages("remotes")
+remotes::install_github("richardjtelford/thermalTolerance")
+library(thermalTolerance)
+
+####new --> faster
+library(future)
+plan(multisession) # activate parallel processing
+# htdata is demo data
+TTHot <- psiiht(temperature = as.numeric(as.character(united_columns_htol$temp_exp)), 
+               warming = TRUE,
+               fvfm = as.numeric(as.character(united_columns_htol$fv_fm_final)),
+               control_temp = 20,
+               id = united_columns_htol$new_id,
+               boots = 5)
+###
+
+# TTHot_march <- psiiht(temperature = as.numeric(as.character(united_columns_htol_march$temp_exp)), 
+#                warming = TRUE,
+#                fvfm = as.numeric(as.character(united_columns_htol_march$fv_fm_final)),
+#                control_temp = 20,
+#                id = united_columns_htol_march$new_id,
+#                boots = 500)#boots can be higher when the script is working
+
+TTHot_sum <- summary(TTHot) # see summary output for T50 values (note, just means)
+# no results for BUI and MAT --> maybe du to the weird curves we obtained earlyer
+
+autoplot(TTHot) # plots logistic curves and dashed lines for Tcrit, T50, T95
+```
+
+```{r}
+#| label: concatenated columns, T50 curves and plots (per plant)
+
+
+# Create concatenated columns for naming
+united_columns_htol_plant <- unite(
+  therm_htol,
+  col = "new_id",
+  site_name, species, age_class, plant_nr, month, leaf_age, proj_2025,
+  sep = "_",
+  remove = TRUE
+) %>% 
+  na.omit()
+
+### T50 CURVES
+
+#install.packages("remotes")
+#remotes::install_github("richardjtelford/thermalTolerance")
+#library(thermalTolerance)
+
+####new --> faster
+# library(future)
+# plan(multisession) # activate parallel processing
+# htdata is demo data
+TTHot_plant <- psiiht(temperature = as.numeric(as.character(united_columns_htol_plant$temp_exp)), 
+               warming = TRUE,
+               fvfm = as.numeric(as.character(united_columns_htol_plant$fv_fm_final)),
+               control_temp = 20,
+               id = united_columns_htol_plant$new_id,
+               boots = 5)
+###
+
+# TTHot_march_plant <- psiiht(temperature = as.numeric(as.character(united_columns_htol_march_plant$temp_exp)), 
+#                warming = TRUE,
+#                fvfm = as.numeric(as.character(united_columns_htol_march_plant$fv_fm_final)),
+#                control_temp = 20,
+#                id = united_columns_htol_march_plant$new_id,
+#                boots = 500)#boots can be higher when the script is working
+
+TTHot_plant_sum <- summary(TTHot_plant) # see summary output for T50 values (note, just means)
+# no results for BUI and MAT --> maybe du to the weird curves we obtained earlyer
+
+autoplot(TTHot_plant) # plots logistic curves and dashed lines for Tcrit, T50, T95
+
+#working, maybe separate the graph
+## PROBLEME : je crois que ça run pour tout à chaque fois et pas seulement pour la plante concernéé (comparer htol_list et htol_list_plant)
+
 
 ```
