@@ -295,21 +295,16 @@ unique(data$remark)
 
 data <- data %>%
   mutate(remark = tolower(remark))%>% #evrything is in small letter to remove all capital letter mistakes
-  
-  # mutate(scanning = case_when(
-  #   grepl("brown", remark) ~ paste(remark),
-  # ))%>% #/!\ ne garder que la partie avec brown pour les commentaires plus long
-  # 
-  mutate(
-    scanning = str_extract(remark, "[^;]*brown[^;]*"),
+ 
+   mutate(
     scanning = str_extract(remark, "[^;]*brown[^;]*") %>% str_trim()
   )%>%
   
   mutate(scanning = case_when(        
-    proj_2025 == "Traits" & age_class == "Building" & plant_nr == "1" & leaf_nr == "20" ~  "mostly brown leaves",
-    proj_2025 == "Traits" & age_class == "Building" & plant_nr == "6" & leaf_nr == "18" ~ "brown leaves",
-    proj_2025 == "Traits" & age_class == "Newly Burnt" & plant_nr == "7" ~ "partly brown leaves",
-    proj_2025 == "Traits" & age_class == "Building" & plant_nr == "8" ~ "brown leaves",
+    month == "March" & proj_2025 == "Traits" & age_class == "Building" & plant_nr == "1" & leaf_nr == "20" ~  "mostly brown leaves",
+    month == "March" & proj_2025 == "Traits" & age_class == "Building" & plant_nr == "6" & leaf_nr == "18" ~ "brown leaves",
+    month == "March" & proj_2025 == "Traits" & age_class == "Newly Burnt" & plant_nr == "7" ~ "partly brown leaves",
+    month == "March" & proj_2025 == "Traits" & age_class == "Building" & plant_nr == "8" ~ "brown leaves",
     TRUE ~ scanning  # keeps all the other remarks the way they were
     ))%>%
   
@@ -320,7 +315,6 @@ data <- data %>%
      grepl("harvested", remark) ~ "no leaf harvested",
     TRUE ~ remark  # keeps all the other remarks the way they were
   ))
-  
 
 unique(data$remark)
 
@@ -335,6 +329,14 @@ unique(data$remark)
 # Relies on cleaned remarks column from step above
 
 # Order of trait measurements is: fvfm_initial, wet_mass, leaf_area, leaf_thickness, dry_mass
+
+data <- data %>%
+  mutate (remark = case_when(
+    grepl("APL2797", envelope_ID) ~ "3 leaves at scanning ; 2 leaves at thickness ; 2 leaves at dry mass"
+  ))
+
+unique(data$remark)
+  
 ```
 
 ```{r}
@@ -825,9 +827,11 @@ ggplot(data %>%  filter(proj_2025 == "Traits"),
     title = "Mean SLA per leaf by plant, age class and month"
   )
 
-# higher SLA for NB than MAT --> ok 
-# high value for BUI 6 probably linked to the low value of dry mass
-# no weird value for MAT 6 even if low value for dry mass
+## March
+# BUI 6 (ADM0437) : 450, high --> 5 leaves at scanning, 5 leaves at dry mass, envelope checked
+
+## May
+# MAT 6 (ATQ5149) : 0.576 for SLA, envelope checked
 ```
 
 ```{r}
@@ -846,6 +850,126 @@ ggplot(data %>%  filter(proj_2025 == "Traits"),
     title = "Mean LDMC per leaf by plant, age class and month"
   )
 
-# LDMC rise with the age of the plant --> ok because leaves from mature plant are more structured with lignine for example
-# weird value for BUI 6 and MAT 6 --> may be linked to the 2 low values in the graph of dry mass
+
+## March
+# BUI 6 (ADM0437) : 0.265, low --> 5 leaves at dry mass, envelope checked
+# MAT 6 (AEI1422) : 0.335, low --> 5 leaves at dry mass, envelope checked 
+
+## May
+# MAT 6 (ATQ5149) : 0.888, high, envelope checked
+```
+
+# Check fluorescence outliers
+
+```{r}
+#| label: check fluorescence outliers
+
+# making a scatterplot for initial fluorescence
+(data %>% 
+         filter(proj_2025 == "Traits") %>% 
+       ggplot(aes(x = factor(plant_nr), y = fv_fm_initial, colour = factor(plant_nr))) +
+  geom_point(size = 2, alpha = 0.8,
+             position = position_jitter(width = 0.15)) +
+  facet_grid(age_class ~ month) +
+  theme_bw() +
+  labs(
+    x = "Plant number",
+    y = "fv_fm_initial",
+    title = "Initial fluorescence by plant, age class and month"
+  ))
+
+(data %>% 
+         filter(proj_2025 == "TT Hot") %>% 
+       ggplot(aes(x = factor(plant_nr), y = fv_fm_final, colour = factor(plant_nr))) +
+  geom_point(size = 2, alpha = 0.8,
+             position = position_jitter(width = 0.15)) +
+  facet_grid(age_class ~ month) +
+  theme_bw() +
+  labs(
+    x = "Plant number",
+    y = "fv_fm_final",
+    title = "Final fluorescence TT Hot by plant, age class and month"
+  ))
+
+(data %>% 
+         filter(proj_2025 == "TT Cold") %>% 
+       ggplot(aes(x = factor(plant_nr), y = fv_fm_final, colour = factor(plant_nr))) +
+  geom_point(size = 2, alpha = 0.8,
+             position = position_jitter(width = 0.15)) +
+  facet_grid(age_class ~ month) +
+  theme_bw() +
+  labs(
+    x = "Plant number",
+    y = "fv_fm_final",
+    title = "Final fluorescence TT Cold by plant, age class and month"
+  ))
+# one value is registered as a January one --> modification is in data cleaning entire frame
+
+#### Initial fluorescence
+
+## March
+# MAT 3 have a high fv/fm ; same for BUI 5 
+# low points for NB 5, 7 and 8 --> maybe due to the season
+
+## May 
+# MAT 8 old : low --> brown leaves
+# PIO 8 (AUS1188) : 0.38, low --> envelope checked
+
+#### final fluorescence TT Hot 
+# High value for BUI 4 (we don't have that in the initial fluo graph)
+```
+
+```{r}
+#| label: check fluorescence outliers TT Hot
+
+
+data %>% 
+  filter(proj_2025 == "TT Hot") %>% 
+  
+  ggplot(aes(x = as.numeric(as.character(temp_exp)), 
+             y = fv_fm_final,
+             group = plant_nr,      
+             color = plant_nr)) +
+  
+  geom_point(size = 2, alpha = 0.8,
+             position = position_jitter(width = 0.15)) +
+  geom_line() +
+
+  facet_grid(age_class ~ month) + #leaf_age
+  theme_bw() +
+  labs(
+    x = "Temperature",
+    y = "fv_fm_final",
+    title = "Fv/Fm response to hot temperature across plants, age classes and months"
+  )
+```
+
+```{r}
+#| label: check fluorescence outliers TT Cold
+
+data %>% 
+  filter(proj_2025 == "TT Cold") %>% 
+  mutate(temp_exp = factor(temp_exp, levels = c("5", "0", "-5", "-10","-15", "-20"))) %>%
+  ggplot(aes(x = temp_exp, 
+             y = fv_fm_final,
+             group = plant_nr,      
+             color = plant_nr)) +
+  
+  geom_point(size = 2, alpha = 0.8,
+             position = position_jitter(width = 0.15)) +
+  geom_line() +
+
+  facet_grid(age_class ~ month) + #leaf_age
+  theme_bw() +
+  labs(
+    x = "Temperature",
+    y = "fv_fm_final",
+    title = "Fv/Fm response to cold temperature across plants, age classes and months"
+  )
+```
+
+# Hot T50 curves
+
+```{r}
+
 ```
