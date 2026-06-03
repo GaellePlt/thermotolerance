@@ -288,7 +288,7 @@ Above was cleaning of column names, formatting of variables etc. Now we need to 
 #| label: standardize comments and remarks
 
 # Find unique comments in the dataset
-unique(data$remark)
+# unique(data$remark)
 
 # Multiple comment strings in the column (EXAMPLE ONLY AT THE MOMENT!)
 ## first observation : some REMARKS are the same but with capital letters for example
@@ -298,7 +298,7 @@ data <- data %>%
  
    mutate(
     scanning = str_extract(remark, "[^;]*brown[^;]*") %>% str_trim()
-  )%>%
+  )%>% # /!\ /!\
   
   mutate(scanning = case_when(        
     month == "March" & proj_2025 == "Traits" & age_class == "Building" & plant_nr == "1" & leaf_nr == "20" ~  "mostly brown leaves",
@@ -311,14 +311,21 @@ data <- data %>%
   mutate (remark = case_when(
     grepl("water", remark) ~ "liquid water in bag",
     grepl("fridge", remark) ~ "not removed from fridge, no balls",
-    grepl("only", remark) ~ "3 leaves at scanning; mostly brown leaves; 3 leaves at thickness",
+    # grepl("only", remark) ~ "3 leaves at scanning; mostly brown leaves; 3 leaves at thickness", # /!\ /!\
      grepl("harvested", remark) ~ "no leaf harvested",
     TRUE ~ remark  # keeps all the other remarks the way they were
+  )) %>%
+  mutate(remark = case_when(
+    grepl("3 leaves at scanning ; 3 leaves at thickness ; 3 leaves at dry mass", remark) ~ "3 leaves at scanning; 3 leaves at thickness; 3 leaves at dry mass",
+    grepl("brown leaves ; 3 leaves at wet mass ; 3 leaves at thickness ; 3 leaves at dry mass", remark) ~ "brown leaves; 3 leaves at wet mass; 3 leaves at thickness; 3 leaves at dry mass",
+    grepl("brown leaves ; 5 leaves at scanning ; 5 leaves at thickness ; 5 leaves at dry mass", remark) ~ "brown leaves; 5 leaves at scanning; 5 leaves at thickness; 5 leaves at dry mass",
+    grepl("5 leaves at scanning might be one leaf in 2 pieces ; 5 leaves at thickness ; 5 leaves at dry mass", remark) ~ "5 leaves at scanning might be one leaf in 2 pieces; 5 leaves at thickness; 5 leaves at dry mass",
+    TRUE ~ remark
   ))
 
 unique(data$remark)
 
-## NOT ENTIRELY DONE 
+## NOT ENTIRELY DONE
 ```
 
 ```{r}
@@ -1034,6 +1041,101 @@ autoplot(TTHot) # plots logistic curves and dashed lines for Tcrit, T50, T95
 ```
 
 ```{r}
+### PLOT
+
+# Create a summary table that provides the median, standard error, and lower (2.5%) and upper (2.5%) quantiles for each ID and each thermal metric (T50, T95 and Tcrit)
+
+summarise_htol <- function(res, id) {
+  
+  # si c'est null on met des NA pour que ça ne bloque pas
+  if (is.null(res)) {
+    return(data.frame(
+      id = id,
+      metric = c("T50", "T95", "Tcrit"),
+      estimate = NA,
+      se = NA,
+      lower = NA,
+      upper = NA
+    ))
+  } 
+  
+  # sinon on calucule normalement
+  data.frame(
+    id = id,
+    metric = c("T50", "T95", "Tcrit"),
+    estimate = c(median(res$T50, na.rm = TRUE),
+                 median(res$T95, na.rm = TRUE),
+                 median(res$Tcrit, na.rm = TRUE)),
+    se = c(sd(res$T50, na.rm = TRUE),
+           sd(res$T95, na.rm = TRUE),
+           sd(res$Tcrit, na.rm = TRUE)),
+    lower = c(quantile(res$T50, 0.025, na.rm = TRUE),
+              quantile(res$T95, 0.025, na.rm = TRUE),
+              quantile(res$Tcrit, 0.025, na.rm = TRUE)),
+    upper = c(quantile(res$T50, 0.975, na.rm = TRUE),
+              quantile(res$T95, 0.975, na.rm = TRUE),
+              quantile(res$Tcrit, 0.975, na.rm = TRUE))
+  )
+}
+
+# Run the summarize function for each ID output
+TTHot_out <- Map(
+  summarise_htol, # function
+  TTHot$results, # extract the results part of the psiiht output
+  names(TTHot$results)  # extract the ID from the psiiht output
+  )
+#semble fonctionner
+
+# Create the dataframe by rowbinding 
+TTHot_thermal <- do.call(rbind, TTHot_out)
+#on obtient un tableau
+
+# String split back to columns the ID, nouveau tableau
+TTHot_wide <- TTHot_thermal %>%
+  separate_wider_delim(
+    cols = id, # the column to split
+    delim = "_", # how is the column seperated
+    # what should the new columns be called - do in order
+    names = c("site_name", "species", "age_class", "month", "leaf_age", "proj_2025") #,
+   # too_many = "merge", # Merges any extra parts into the last column
+   # too_few = "align_start" # Fills missing values with NA
+  ) %>% 
+  # Check the data type of the new output columns and convert if necessary
+   mutate(
+    age_class = factor(age_class),
+    proj_2025 = factor(proj_2025),
+    site_name = factor(site_name),
+    month = factor(month),
+    leaf_age = factor(leaf_age),
+    species = factor(species)
+  ) %>% 
+  # Relevel factors in natural order
+  mutate(
+    age_class = factor(age_class, levels = c("Newly Burnt","Pioneer","Building", "Mature")))
+
+# Create a preliminary plot focusing on T50 metric
+TTHot_wide %>% 
+  filter(metric == "T50") %>% 
+ggplot(aes(x = age_class,
+           y = estimate,
+           color = month)) +
+  geom_point(size = 3,
+              position = position_dodge(width = 0.3)) +
+  geom_errorbar(aes(ymin = estimate - se, ymax = estimate + se),
+                width = 0.2,
+                position = position_dodge(width = 0.3)) +
+  facet_grid(site_name ~ species) +
+  labs(
+    x = "Age Class",
+    y = "T50 (°C)",
+    color = "treatment",
+    title = "T50 by Age Class for hot treatment",
+    subtitle = "Points show mean bootstrap estimate; bars show ±1 SE"
+  ) +
+  theme_bw()
+```
+
+```{r}
 #| label: concatenated columns, T50 curves and plots (per plant)
 
 
@@ -1081,4 +1183,99 @@ autoplot(TTHot_plant) # plots logistic curves and dashed lines for Tcrit, T50, T
 ## PROBLEME : je crois que ça run pour tout à chaque fois et pas seulement pour la plante concernéé (comparer htol_list et htol_list_plant)
 
 
+```
+
+```{r}
+### PLOTS
+
+summarise_htol_plant <- function(res, id) {
+  
+  # si c'est null on met des NA pour que ça ne bloque pas
+  if (is.null(res)) {
+    return(data.frame(
+      id = id,
+      metric = c("T50", "T95", "Tcrit"),
+      estimate = NA,
+      se = NA,
+      lower = NA,
+      upper = NA
+    ))
+  } 
+  
+  # sinon on calucule normalement
+  data.frame(
+    id = id,
+    metric = c("T50", "T95", "Tcrit"),
+    estimate = c(median(res$T50, na.rm = TRUE),
+                 median(res$T95, na.rm = TRUE),
+                 median(res$Tcrit, na.rm = TRUE)),
+    se = c(sd(res$T50, na.rm = TRUE),
+           sd(res$T95, na.rm = TRUE),
+           sd(res$Tcrit, na.rm = TRUE)),
+    lower = c(quantile(res$T50, 0.025, na.rm = TRUE),
+              quantile(res$T95, 0.025, na.rm = TRUE),
+              quantile(res$Tcrit, 0.025, na.rm = TRUE)),
+    upper = c(quantile(res$T50, 0.975, na.rm = TRUE),
+              quantile(res$T95, 0.975, na.rm = TRUE),
+              quantile(res$Tcrit, 0.975, na.rm = TRUE))
+  )
+}
+
+# Run the summarize function for each ID output
+TTHot_plant_out <- Map(
+  summarise_htol_plant, # function
+  TTHot_plant$results, # extract the results part of the psiiht output
+  names(TTHot_plant$results)  # extract the ID from the psiiht output
+  )
+#semble fonctionner
+
+# Create the dataframe by rowbinding
+TTHot_thermal_plant <- do.call(rbind, TTHot_plant_out)
+
+# String split back to columns the ID
+TTHot_wide_plant <- TTHot_thermal_plant %>%
+  separate_wider_delim(
+    cols = id, # the column to split
+    delim = "_", # how is the column seperated
+    # what should the new columns be called - do in order
+    names = c("site_name", "species", "age_class", "plant_nr", "month", "leaf_age", "proj_2025") #,
+   # too_many = "merge", # Merges any extra parts into the last column
+   # too_few = "align_start" # Fills missing values with NA
+  ) %>% 
+  # Check the data type of the new output columns and convert if necessary
+   mutate(
+    age_class = factor(age_class),
+    proj_2025 = factor(proj_2025),
+    site_name = factor(site_name),
+    month = factor(month),
+    leaf_age = factor(leaf_age),
+    species = factor(species),
+    plant_nr = factor(plant_nr)
+  ) %>% 
+  # Relevel factors in natural order
+  mutate(
+    age_class = factor(age_class, levels = c("Newly Burnt","Pioneer", "Building", "Mature")))
+
+# Create a preliminary plot focusing on T50 metric
+TTHot_wide_plant %>% 
+  filter(metric == "T50") %>% 
+ggplot(aes(x = age_class,
+           y = estimate,
+           color = plant_nr)) +
+  geom_point(size = 2,
+              position = position_dodge(width = 0.6)) +
+  geom_errorbar(aes(ymin = estimate - se, ymax = estimate + se),
+                width = 0.2,
+                position = position_dodge(width = 0.6)) +
+  facet_grid(month ~ leaf_age) +
+  labs(
+    x = "Age Class",
+    y = "T50 (°C)",
+    color = "plant_nr",
+    title = "T50 for each plant for TT Hot by age class",
+    subtitle = "Points show mean bootstrap estimate; bars show ±1 SE"
+  ) +
+  theme_bw()
+#working for 50 but not 500 ?
+#marche avec 200 mais les barres au niveau de la plante 5 et 4 s'agrandissent 
 ```
