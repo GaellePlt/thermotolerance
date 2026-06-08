@@ -19,6 +19,7 @@ library(janitor) # Has tools for data cleaning
 library(lubridate) # Date and time formatting
 library(readr) # Data importation functions
 library(stringr) # String and character text
+library(future) # using severals cores at the same time
 ```
 
 March data
@@ -993,151 +994,59 @@ therm_htol<- data %>%
   ) %>% # We did not keep MAT and BUI in March because they were mainly initially dead (based on the Fv/Fm graph). Consequently, we could not obtain a T50 curve or a T50 estimation for those age classes.
   
   filter(proj_2025 == "TT Hot")%>% 
-  select(month, site_name, species, age_class, leaf_age, proj_2025, plant_nr, temp_exp, temp_exp_time, fv_fm_final)
+  select(month, site_name, species, age_class, leaf_age, proj_2025, plant_nr, temp_exp, fv_fm_final)
 ```
 
 ```{r}
 #| label:  concatenated columns, T50 curves and plots (age_class)
-
-# Create table with concatenated columns for naming
-united_columns_htol <- unite(
-  therm_htol,
-  col = "new_id",
-  site_name, species, age_class, month, leaf_age, proj_2025,
-  sep = "_",
-  remove = TRUE
-) %>% 
-  na.omit()
-
-### T50 CURVES
-
-install.packages("remotes")
-remotes::install_github("richardjtelford/thermalTolerance")
-library(thermalTolerance)
-
-####new --> faster
-library(future)
-plan(multisession) # activate parallel processing
-# htdata is demo data
-TTHot <- psiiht(temperature = as.numeric(as.character(united_columns_htol$temp_exp)), 
-               warming = TRUE,
-               fvfm = as.numeric(as.character(united_columns_htol$fv_fm_final)),
-               control_temp = 20,
-               id = united_columns_htol$new_id,
-               boots = 5)
-###
-
-# TTHot_march <- psiiht(temperature = as.numeric(as.character(united_columns_htol_march$temp_exp)), 
+# 
+# # Create table with concatenated columns for naming
+# united_columns_htol <- unite(
+#   therm_htol,
+#   col = "new_id",
+#   site_name, species, age_class, month, leaf_age, proj_2025,
+#   sep = "_",
+#   remove = TRUE
+# ) %>% 
+#   na.omit()
+# 
+# ### T50 CURVES
+# 
+# install.packages("remotes")
+# remotes::install_github("richardjtelford/thermalTolerance")
+# library(thermalTolerance)
+# 
+# ####new --> faster
+# library(future)
+# plan(multisession) # activate parallel processing
+# # htdata is demo data
+# TTHot <- psiiht(temperature = as.numeric(as.character(united_columns_htol$temp_exp)), 
 #                warming = TRUE,
-#                fvfm = as.numeric(as.character(united_columns_htol_march$fv_fm_final)),
+#                fvfm = as.numeric(as.character(united_columns_htol$fv_fm_final)),
 #                control_temp = 20,
-#                id = united_columns_htol_march$new_id,
-#                boots = 500)#boots can be higher when the script is working
-
-TTHot_sum <- summary(TTHot) # see summary output for T50 values (note, just means)
-# no results for BUI and MAT --> maybe du to the weird curves we obtained earlyer
-
-autoplot(TTHot) # plots logistic curves and dashed lines for Tcrit, T50, T95
+#                id = united_columns_htol$new_id,
+#                boots = 5)
+# ###
+# 
+# # TTHot_march <- psiiht(temperature = as.numeric(as.character(united_columns_htol_march$temp_exp)), 
+# #                warming = TRUE,
+# #                fvfm = as.numeric(as.character(united_columns_htol_march$fv_fm_final)),
+# #                control_temp = 20,
+# #                id = united_columns_htol_march$new_id,
+# #                boots = 500)#boots can be higher when the script is working
+# 
+# TTHot_sum <- summary(TTHot) # see summary output for T50 values (note, just means)
+# # no results for BUI and MAT --> maybe du to the weird curves we obtained earlyer
+# 
+# autoplot(TTHot) # plots logistic curves and dashed lines for Tcrit, T50, T95
 ```
 
 ```{r}
-### PLOT
 
-# Create a summary table that provides the median, standard error, and lower (2.5%) and upper (2.5%) quantiles for each ID and each thermal metric (T50, T95 and Tcrit)
-
-summarise_htol <- function(res, id) {
-  
-  # si c'est null on met des NA pour que ça ne bloque pas
-  if (is.null(res)) {
-    return(data.frame(
-      id = id,
-      metric = c("T50", "T95", "Tcrit"),
-      estimate = NA,
-      se = NA,
-      lower = NA,
-      upper = NA
-    ))
-  } 
-  
-  # sinon on calucule normalement
-  data.frame(
-    id = id,
-    metric = c("T50", "T95", "Tcrit"),
-    estimate = c(median(res$T50, na.rm = TRUE),
-                 median(res$T95, na.rm = TRUE),
-                 median(res$Tcrit, na.rm = TRUE)),
-    se = c(sd(res$T50, na.rm = TRUE),
-           sd(res$T95, na.rm = TRUE),
-           sd(res$Tcrit, na.rm = TRUE)),
-    lower = c(quantile(res$T50, 0.025, na.rm = TRUE),
-              quantile(res$T95, 0.025, na.rm = TRUE),
-              quantile(res$Tcrit, 0.025, na.rm = TRUE)),
-    upper = c(quantile(res$T50, 0.975, na.rm = TRUE),
-              quantile(res$T95, 0.975, na.rm = TRUE),
-              quantile(res$Tcrit, 0.975, na.rm = TRUE))
-  )
-}
-
-# Run the summarize function for each ID output
-TTHot_out <- Map(
-  summarise_htol, # function
-  TTHot$results, # extract the results part of the psiiht output
-  names(TTHot$results)  # extract the ID from the psiiht output
-  )
-#semble fonctionner
-
-# Create the dataframe by rowbinding 
-TTHot_thermal <- do.call(rbind, TTHot_out)
-#on obtient un tableau
-
-# String split back to columns the ID, nouveau tableau
-TTHot_wide <- TTHot_thermal %>%
-  separate_wider_delim(
-    cols = id, # the column to split
-    delim = "_", # how is the column seperated
-    # what should the new columns be called - do in order
-    names = c("site_name", "species", "age_class", "month", "leaf_age", "proj_2025") #,
-   # too_many = "merge", # Merges any extra parts into the last column
-   # too_few = "align_start" # Fills missing values with NA
-  ) %>% 
-  # Check the data type of the new output columns and convert if necessary
-   mutate(
-    age_class = factor(age_class),
-    proj_2025 = factor(proj_2025),
-    site_name = factor(site_name),
-    month = factor(month),
-    leaf_age = factor(leaf_age),
-    species = factor(species)
-  ) %>% 
-  # Relevel factors in natural order
-  mutate(
-    age_class = factor(age_class, levels = c("Newly Burnt","Pioneer","Building", "Mature")))
-
-# Create a preliminary plot focusing on T50 metric
-TTHot_wide %>% 
-  filter(metric == "T50") %>% 
-ggplot(aes(x = age_class,
-           y = estimate,
-           color = month)) +
-  geom_point(size = 3,
-              position = position_dodge(width = 0.3)) +
-  geom_errorbar(aes(ymin = estimate - se, ymax = estimate + se),
-                width = 0.2,
-                position = position_dodge(width = 0.3)) +
-  facet_grid(site_name ~ species) +
-  labs(
-    x = "Age Class",
-    y = "T50 (°C)",
-    color = "treatment",
-    title = "T50 by Age Class for hot treatment",
-    subtitle = "Points show mean bootstrap estimate; bars show ±1 SE"
-  ) +
-  theme_bw()
 ```
 
 ```{r}
-#| label: concatenated columns, T50 curves and plots (per plant)
-
+#| label: concatenated-columns-per-plant
 
 # Create concatenated columns for naming
 united_columns_htol_plant <- unite(
@@ -1149,44 +1058,38 @@ united_columns_htol_plant <- unite(
 ) %>% 
   na.omit()
 
-### T50 CURVES
+```
+
+```{r}
+#| label: T50-curves-and-plots-per-plant
+#| warning: false
 
 #install.packages("remotes")
-#remotes::install_github("richardjtelford/thermalTolerance")
-#library(thermalTolerance)
+# remotes::install_github("richardjtelford/thermalTolerance")
+library(thermalTolerance)
 
-####new --> faster
-# library(future)
-# plan(multisession) # activate parallel processing
-# htdata is demo data
+set.seed(19) # avoir la même chose a chaque fois comme ça il n'y a pas des moments où ça marche et d'autres non  
+plan(multisession) # activate parallel processing
+
 TTHot_plant <- psiiht(temperature = as.numeric(as.character(united_columns_htol_plant$temp_exp)), 
                warming = TRUE,
                fvfm = as.numeric(as.character(united_columns_htol_plant$fv_fm_final)),
                control_temp = 20,
                id = united_columns_htol_plant$new_id,
-               boots = 5)
-###
-
-# TTHot_march_plant <- psiiht(temperature = as.numeric(as.character(united_columns_htol_march_plant$temp_exp)), 
-#                warming = TRUE,
-#                fvfm = as.numeric(as.character(united_columns_htol_march_plant$fv_fm_final)),
-#                control_temp = 20,
-#                id = united_columns_htol_march_plant$new_id,
-#                boots = 500)#boots can be higher when the script is working
+               boots = 10)
 
 TTHot_plant_sum <- summary(TTHot_plant) # see summary output for T50 values (note, just means)
+
+## March
 # no results for BUI and MAT --> maybe du to the weird curves we obtained earlyer
 
 autoplot(TTHot_plant) # plots logistic curves and dashed lines for Tcrit, T50, T95
 
-#working, maybe separate the graph
-## PROBLEME : je crois que ça run pour tout à chaque fois et pas seulement pour la plante concernéé (comparer htol_list et htol_list_plant)
-
-
 ```
 
 ```{r}
-### PLOTS
+#| label: T50-plots-per-plant
+#| warning: false
 
 summarise_htol_plant <- function(res, id) {
   
@@ -1276,6 +1179,5 @@ ggplot(aes(x = age_class,
     subtitle = "Points show mean bootstrap estimate; bars show ±1 SE"
   ) +
   theme_bw()
-#working for 50 but not 500 ?
-#marche avec 200 mais les barres au niveau de la plante 5 et 4 s'agrandissent 
+
 ```
