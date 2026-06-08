@@ -986,15 +986,22 @@ data %>%
 
 ```{r}
 #| label: Create data frame
-
 # Create table with four columns
-therm_htol<- data %>% 
-  filter(
-    !(month == "March" & age_class %in% c("Mature", "Building"))
-  ) %>% # We did not keep MAT and BUI in March because they were mainly initially dead (based on the Fv/Fm graph). Consequently, we could not obtain a T50 curve or a T50 estimation for those age classes.
-  
-  filter(proj_2025 == "TT Hot")%>% 
-  select(month, site_name, species, age_class, leaf_age, proj_2025, plant_nr, temp_exp, fv_fm_final)
+therm_htol <- data |>
+  filter(!(month == "March" &
+             age_class %in% c("Mature", "Building"))) |>  # We did not keep MAT and BUI in March because they were mainly initially dead (based on the Fv/Fm graph). Consequently, we could not obtain a T50 curve or a T50 estimation for those age classes.
+  filter(proj_2025 == "TT Hot") |>
+  select(
+    month,
+    site_name,
+    species,
+    age_class,
+    leaf_age,
+    proj_2025,
+    plant_nr,
+    temp_exp,
+    fv_fm_final
+  )
 ```
 
 ```{r}
@@ -1042,21 +1049,60 @@ therm_htol<- data %>%
 ```
 
 ```{r}
-
-```
-
-```{r}
 #| label: concatenated-columns-per-plant
+
 
 # Create concatenated columns for naming
 united_columns_htol_plant <- unite(
   therm_htol,
   col = "new_id",
-  site_name, species, age_class, plant_nr, month, leaf_age, proj_2025,
+  site_name,
+  species,
+  age_class,
+  plant_nr,
+  month,
+  leaf_age,
+  proj_2025,
   sep = "_",
   remove = TRUE
-) %>% 
+) |>
   na.omit()
+```
+
+```{r}
+#| label:  plants-removed-from-T50-estimate
+## Plants that crashed the script to estimate T50
+
+removed <- united_columns_htol_plant |>
+  filter(
+    new_id %in% c(
+      "Lygra_Calluna vulgaris_Mature_8_May_old_TT Hot",
+      "Lygra_Calluna vulgaris_Building_4_May_young_TT Hot",
+      "Lygra_Calluna vulgaris_Mature_4_May_young_TT Hot",
+      "Lygra_Calluna vulgaris_Pioneer_8_May_young_TT Hot"
+    )
+  )
+
+removed |>
+  mutate(temp_exp = as.numeric(as.character(temp_exp)),
+         fv_fm_final = as.numeric(as.character(fv_fm_final))) |>
+  ggplot(aes(x = temp_exp, y = fv_fm_final, color = new_id)) +
+  facet_grid(new_id ~ .) +
+  geom_line()
+```
+
+```{r}
+#| label: concatenated-columns-per-plant-cleaned
+
+united_columns_htol_plant |> 
+ filter(
+    !new_id %in% c(
+      # "Lygra_Calluna vulgaris_Mature_8_May_old_TT Hot",
+      # "Lygra_Calluna vulgaris_Building_4_May_young_TT Hot",
+      # "Lygra_Calluna vulgaris_Mature_4_May_young_TT Hot",
+      "Lygra_Calluna vulgaris_Pioneer_8_May_young_TT Hot"
+    )
+  ) # removed because they crashed the T50 estimate script
 
 ```
 
@@ -1064,26 +1110,33 @@ united_columns_htol_plant <- unite(
 #| label: T50-curves-and-plots-per-plant
 #| warning: false
 
-#install.packages("remotes")
+# install.packages("remotes")
 # remotes::install_github("richardjtelford/thermalTolerance")
 library(thermalTolerance)
 
-set.seed(19) # avoir la même chose a chaque fois comme ça il n'y a pas des moments où ça marche et d'autres non  
+library(future)
+plan(sequential)
 plan(multisession) # activate parallel processing
+set.seed(19) # avoir la même chose a chaque fois comme ça il n'y a pas des moments où ça marche et d'autres non  
+
 
 TTHot_plant <- psiiht(temperature = as.numeric(as.character(united_columns_htol_plant$temp_exp)), 
                warming = TRUE,
                fvfm = as.numeric(as.character(united_columns_htol_plant$fv_fm_final)),
                control_temp = 20,
                id = united_columns_htol_plant$new_id,
-               boots = 10)
+               boots = 500)
 
 TTHot_plant_sum <- summary(TTHot_plant) # see summary output for T50 values (note, just means)
 
-## March
-# no results for BUI and MAT --> maybe du to the weird curves we obtained earlyer
-
 autoplot(TTHot_plant) # plots logistic curves and dashed lines for Tcrit, T50, T95
+
+## March
+# no results : BUI and MAT (--> removed)
+
+## May 
+# crash the model : MAT 8 old (no estimate); MAT 4 young (no T50); BUI 4 young (no estimate); PIO 8 old (T95 > 70°C) (-->removed)
+# no results (no curves) : BUI 1 old; BUI 1 young;
 
 ```
 
