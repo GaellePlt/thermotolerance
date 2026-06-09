@@ -19,7 +19,8 @@ library(janitor) # Has tools for data cleaning
 library(lubridate) # Date and time formatting
 library(readr) # Data importation functions
 library(stringr) # String and character text
-library(future) # using severals cores at the same time
+library(future) # Using severals cores at the same time
+library(lme4) # Lineare Mixed Model with Nested effects
 ```
 
 March data
@@ -988,8 +989,8 @@ data %>%
 #| label: Create-hot-data-frame
 # Create table with four columns
 therm_htol <- data |>
-  filter(!(month == "March" &
-             age_class %in% c("Mature", "Building"))) |>  # We did not keep MAT and BUI in March because they were mainly initially dead (based on the Fv/Fm graph). Consequently, we could not obtain a T50 curve or a T50 estimation for those age classes.
+  # filter(!(month == "March" &
+  #            age_class %in% c("Mature", "Building"))) |>  # We did not keep MAT and BUI in March because they were mainly initially dead (based on the Fv/Fm graph). Consequently, we could not obtain a T50 curve or a T50 estimation for those age classes.
   filter(proj_2025 == "TT Hot") |>
   select(
     month,
@@ -1053,9 +1054,9 @@ removed |>
 united_columns_htol_plant |> 
  filter(
     !new_id %in% c(
-      # "Lygra_Calluna vulgaris_Mature_8_May_old_TT Hot",
-      # "Lygra_Calluna vulgaris_Building_4_May_young_TT Hot",
-      # "Lygra_Calluna vulgaris_Mature_4_May_young_TT Hot",
+      "Lygra_Calluna vulgaris_Mature_8_May_old_TT Hot",
+      "Lygra_Calluna vulgaris_Building_4_May_young_TT Hot",
+      "Lygra_Calluna vulgaris_Mature_4_May_young_TT Hot",
       "Lygra_Calluna vulgaris_Pioneer_8_May_young_TT Hot"
     )
   ) # removed because they crashed the T50 estimate script
@@ -1389,4 +1390,49 @@ ggplot(aes(x = age_class,
     subtitle = "Points show mean bootstrap estimate; bars show ±1 SE"
   ) +
   theme_bw()
+```
+
+# Effect of age classe, season and their interaction on T50
+
+## Lineare Mixed Model with Nested effects:
+
+-   Fixed effects: age_class, month
+
+-   Random effect: random effect (plant_nr) nested within a fixed effect (age_class)
+
+### /!\\ Assumptions to verify for an LMM
+
+1.  Normality of residuals
+
+2.  Homoscedasticity (Equal variance of residuals)
+
+3.  Independence of residuals
+
+4.  Normality of random effects
+
+5.  Correct specification of the random effects structure
+
+6.  Absence of multicollinearity (Among fixed effects)
+
+7.  Linearity (For fixed effects relationships)
+
+8.  Bonus : Post-hoc diagnostic testing and R-squared calculation
+
+```{r}
+#| label: LMM-htol 
+
+# How does season, age class and their interaction impact T50?
+# H1 - response (T50) ~ age class * season 
+
+TTHot_wide_plant <- TTHot_wide_plant |>  
+  na.omit()
+
+model_htol_1 <- lmer(estimate ~ age_class * month + # Fixed effects; dependant
+        (1 | age_class:plant_nr), # Random effect: we have a random effect (plant_nr) nested within a fixed effect (age_class).
+        data = TTHot_wide_plant)
+# table(TTHot_wide_plant$age_class, TTHot_wide_plant$month) --> 0 fro BUI and MAT for March --> removed because no T50 curves
+
+isSingular(model_htol_1) # TRUE...
+
+summary(model_htol_1)
 ```
