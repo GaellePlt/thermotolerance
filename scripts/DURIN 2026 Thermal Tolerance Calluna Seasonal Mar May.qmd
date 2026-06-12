@@ -1428,7 +1428,7 @@ TTHot_wide_plant <- TTHot_wide_plant |>
   na.omit()
 
 model_htol_1 <- lmer(estimate ~ age_class * month + # Fixed effects; dependant
-        (1 | age_class:plant_nr), # Random effect: we have a random effect (plant_nr) nested within a fixed effect (age_class).
+        (1 | age_class/plant_nr), # Random effect: we have a random effect (plant_nr) nested within a fixed effect (age_class).
         data = TTHot_wide_plant)
 # table(TTHot_wide_plant$age_class, TTHot_wide_plant$month) --> 0 fro BUI and MAT for March --> removed because no T50 curves
 
@@ -1436,3 +1436,5 @@ isSingular(model_htol_1) # TRUE...
 
 summary(model_htol_1)
 ```
+
+# Effect of traits on T50
