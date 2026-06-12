@@ -1094,7 +1094,6 @@ autoplot(TTHot_plant) # plots logistic curves and dashed lines for Tcrit, T50, T
 ## May 
 # crash the model : MAT 8 old (no estimate); MAT 4 young (no T50); BUI 4 young (no estimate); PIO 8 old (T95 > 70°C) (-->removed)
 # no results (no curves) : BUI 1 old; BUI 1 young;
-
 ```
 
 ```{r}
@@ -1182,11 +1181,21 @@ ggplot(aes(x = age_class,
                 position = position_dodge(width = 0.6)) +
   facet_grid(month ~ leaf_age) +
   labs(
-    x = "Age Class",
+    x = "Age class",
     y = "T50 (°C)",
-    color = "plant_nr",
-    title = "T50 for each plant for TT Hot by age class",
-    subtitle = "Points show mean bootstrap estimate; bars show ±1 SE"
+    color = "Plant number",
+    title = bquote("Heat tolerance ("*T[50]*") of" ~ italic("Calluna vulgaris") ~ "across different age classes and seasons"),
+    subtitle = "Points represent bootstrap means; bars show ±1 SE"
+  ) +
+ stat_summary(
+  aes(group = age_class),
+  fun.data = function(y) {
+    data.frame(y = 30, label = paste0("n = ", length(y)))
+  },
+  geom = "text",
+  color = "grey40",
+  size = 3.2,
+  vjust = 0
   ) +
   theme_bw()
 
@@ -1385,9 +1394,19 @@ ggplot(aes(x = age_class,
   labs(
     x = "Age Class",
     y = "T50 (°C)",
-    color = "plant_nr",
-    title = "T50 for each plant for TT Hot by age class",
+    color = "plant number",
+    title = bquote("He tolerance ("*T[50]*") of" ~ italic("Calluna vulgaris") ~ "across different age classes and seasons"),
     subtitle = "Points show mean bootstrap estimate; bars show ±1 SE"
+  ) +
+   stat_summary(
+  aes(group = age_class),
+  fun.data = function(y) {
+    data.frame(y = -48, label = paste0("n = ", length(y)))
+  },
+  geom = "text",
+  color = "grey40",
+  size = 3.2,
+  vjust = 0
   ) +
   theme_bw()
 ```
@@ -1436,5 +1455,7 @@ isSingular(model_htol_1) # TRUE...
 
 summary(model_htol_1)
 ```
+
+## Linear model
 
 # Effect of traits on T50
