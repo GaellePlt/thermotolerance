@@ -1082,7 +1082,7 @@ TTHot_plant <- psiiht(temperature = as.numeric(as.character(united_columns_htol_
                fvfm = as.numeric(as.character(united_columns_htol_plant$fv_fm_final)),
                control_temp = 20,
                id = united_columns_htol_plant$new_id,
-               boots = 1000)
+               boots = 5)# put 1000
 
 TTHot_plant_sum <- summary(TTHot_plant) # see summary output for T50 values (note, just means)
 
@@ -1287,7 +1287,7 @@ TTCold_plant <- psiiht(temperature = as.numeric(as.character(united_columns_cold
                fvfm = as.numeric(as.character(united_columns_cold_plant$fv_fm_final)),
                control_temp = 5,
                id = united_columns_cold_plant$new_id,
-               boots = 1000)
+               boots = 5)# put 1000
 
 TTCold_plant_sum <- summary(TTCold_plant) # see summary output for T50 values (note, just means)
 
@@ -1459,3 +1459,24 @@ summary(model_htol_1)
 ## Linear model
 
 # Effect of traits on T50
+
+```{r}
+
+#| label: Correlation between traits
+
+library(ggcorrplot)
+
+traits_data <- data |>
+  filter(proj_2025 == "Traits") |>
+  select(height_flower, height_vegetative, dry_mass, wet_mass, leaf_area, SLA, LDMC)
+
+corr_matrix = round(cor(traits_data, use = "complete.obs"), 2) #ignoring NA
+ggcorrplot(corr_matrix, hc.order = TRUE, type = "lower", lab = TRUE)
+
+# seuil limit de 0.80
+# dry_mass and wet_mass : 0.89
+# leaf_area and dry_mass : 0.84
+# leaf_area and wet_mass : 0.81
+# height_flower and heigth_vegetative : 0.98
+
+```
