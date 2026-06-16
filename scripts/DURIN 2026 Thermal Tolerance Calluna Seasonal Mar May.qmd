@@ -1467,12 +1467,12 @@ traits_data <- data |>
   filter(proj_2025 == "Traits") |> 
   filter(!(month == "March" &
              age_class %in% c("Mature", "Building"))) |>  # We did not keep MAT and BUI in March because we didn't estimate T50.
-  select(site_name, species, age_class, plant_nr, month, leaf_age, height_flower, height_vegetative, leaf_area, dry_mass, SLA, LDMC)
+  select(site_name, species, month, age_class, plant_nr, leaf_age, height_flower, height_vegetative, leaf_area, wet_mass, dry_mass, SLA, LDMC)
   
 united_columns_traits_plante <- unite(
   traits_data,
   col = "new_id",
-  site_name, species, age_class, plant_nr, month, leaf_age,
+  site_name, species, month,  age_class, plant_nr,leaf_age,
   sep = "_",
   remove = TRUE
 ) |> 
@@ -1483,26 +1483,47 @@ united_columns_traits_plante <- unite(
 ## Effect of traits on Hot T50
 
 ```{r}
-#| label: Create-joint-data-frame-T50-traits
+#| label: Create-joint-data-frame-HT50-traits
 
 # create data frame with T50 estimate for Hot tolerance
 united_columns_HT50_plante <- TTHot_wide_plant |> 
-  select(site_name, species, age_class, plant_nr, month, leaf_age, metric, estimate, se, lower, upper) # carefull in the metric we only want T50 
+  filter(metric == "T50") |> 
+  select(site_name, species, month, age_class, plant_nr, leaf_age, estimate, se, lower, upper) |> # carefull in the metric we only want T50 
   unite(
     col = "new_id",
-    site_name, species, age_class, plant_nr, month, leaf_age,
+    site_name, species, month, age_class, plant_nr, leaf_age,
     sep = "_",
     remove = TRUE
   ) |> 
   na.omit()
 
 # create a joint data frame with trais and T50
+united_columns_joint_traits_HT50 <- left_join(united_columns_traits_plante, united_columns_HT50_plante, by = "new_id")
 
+# String split back to columns the ID
+joint_traits_HT50_wide <- united_columns_joint_traits_HT50 |> 
+  separate_wider_delim(
+    cols = new_id, 
+    delim = "_", 
+    names = c("site_name", "species", "month", "age_class", "plant_nr", "leaf_age")
+  ) |> 
+  mutate(
+    # Check the data type of the new output columns and convert if necessary
+    across(c(site_name, species, plant_nr, leaf_age), factor),
+    # Relevel factors in natural order
+    month = factor(month, levels = c("March", "May")),
+    age_class = factor(age_class, levels = c("Newly Burnt", "Pioneer", "Building", "Mature"))
+  )
 ```
 
 ```{r}
-#| label: Effect-of-traits-on-T50
+#| label: Scale-joint-data-frame-HT50-traits
 
+joint_traits_HT50_scaled <- joint_traits_HT50_wide |> 
+  mutate(
+    across(c(height_flower, height_vegetative, leaf_area, wet_mass, dry_mass, SLA, LDMC), ~ as.numeric(as.character(.x))),
+    across(c(height_flower, height_vegetative, leaf_area, wet_mass, dry_mass, SLA, LDMC), ~ as.numeric(scale(.x)), .names = "{.col}_scaled")
+  )
 
 ```
 
@@ -1518,7 +1539,7 @@ traits_data <- data |>
 corr_matrix = round(cor(traits_data, use = "complete.obs"), 2) #ignoring NA
 ggcorrplot(corr_matrix, hc.order = TRUE, type = "lower", lab = TRUE)
 
-# Cut-off value of 0.80
+# Cut-off value : 0.80 --> literature
 # dry_mass and wet_mass : 0.89
 # leaf_area and dry_mass : 0.84
 # leaf_area and wet_mass : 0.81
