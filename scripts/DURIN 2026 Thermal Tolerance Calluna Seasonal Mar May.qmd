@@ -1532,11 +1532,10 @@ joint_traits_HT50_scaled <- joint_traits_HT50_wide |>
 
 library(ggcorrplot)
 
-traits_data <- data |>
-  filter(proj_2025 == "Traits") |>
+traits_data_corr <- traits_data|>
   select(height_flower, height_vegetative, dry_mass, wet_mass, leaf_area, SLA, LDMC)
 
-corr_matrix = round(cor(traits_data, use = "complete.obs"), 2) #ignoring NA
+corr_matrix = round(cor(traits_data_corr, use = "complete.obs"), 2) #ignoring NA
 ggcorrplot(corr_matrix, hc.order = TRUE, type = "lower", lab = TRUE)
 
 # Cut-off value : 0.80 --> literature
