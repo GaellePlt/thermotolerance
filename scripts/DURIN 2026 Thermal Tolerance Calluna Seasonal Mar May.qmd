@@ -989,8 +989,8 @@ data %>%
 #| label: Create-hot-data-frame
 # Create table with four columns
 therm_htol <- data |>
-  # filter(!(month == "March" &
-  #            age_class %in% c("Mature", "Building"))) |>  # We did not keep MAT and BUI in March because they were mainly initially dead (based on the Fv/Fm graph). Consequently, we could not obtain a T50 curve or a T50 estimation for those age classes.
+  filter(!(month == "March" &
+             age_class %in% c("Mature", "Building"))) |>  # We did not keep MAT and BUI in March because they were mainly initially dead (based on the Fv/Fm graph). Consequently, we could not obtain a T50 curve or a T50 estimation for those age classes.
   filter(proj_2025 == "TT Hot") |>
   select(
     month,
@@ -1461,8 +1461,53 @@ summary(model_htol_1)
 # Effect of traits on T50
 
 ```{r}
+#| label: Create-united-columns-traits-data-frame
 
-#| label: Correlation between traits
+traits_data <- data |> 
+  filter(proj_2025 == "Traits") |> 
+  filter(!(month == "March" &
+             age_class %in% c("Mature", "Building"))) |>  # We did not keep MAT and BUI in March because we didn't estimate T50.
+  select(site_name, species, age_class, plant_nr, month, leaf_age, height_flower, height_vegetative, leaf_area, dry_mass, SLA, LDMC)
+  
+united_columns_traits_plante <- unite(
+  traits_data,
+  col = "new_id",
+  site_name, species, age_class, plant_nr, month, leaf_age,
+  sep = "_",
+  remove = TRUE
+) |> 
+  na.omit()
+
+```
+
+## Effect of traits on Hot T50
+
+```{r}
+#| label: Create-joint-data-frame-T50-traits
+
+# create data frame with T50 estimate for Hot tolerance
+united_columns_HT50_plante <- TTHot_wide_plant |> 
+  select(site_name, species, age_class, plant_nr, month, leaf_age, metric, estimate, se, lower, upper) # carefull in the metric we only want T50 
+  unite(
+    col = "new_id",
+    site_name, species, age_class, plant_nr, month, leaf_age,
+    sep = "_",
+    remove = TRUE
+  ) |> 
+  na.omit()
+
+# create a joint data frame with trais and T50
+
+```
+
+```{r}
+#| label: Effect-of-traits-on-T50
+
+
+```
+
+```{r}
+#| label: Correlation-between-traits
 
 library(ggcorrplot)
 
@@ -1473,10 +1518,22 @@ traits_data <- data |>
 corr_matrix = round(cor(traits_data, use = "complete.obs"), 2) #ignoring NA
 ggcorrplot(corr_matrix, hc.order = TRUE, type = "lower", lab = TRUE)
 
-# seuil limit de 0.80
+# Cut-off value of 0.80
 # dry_mass and wet_mass : 0.89
 # leaf_area and dry_mass : 0.84
 # leaf_area and wet_mass : 0.81
 # height_flower and heigth_vegetative : 0.98
+
+# We removed wet and dry mass because they are correlated with leaf area and with each other, and they are already represented in the LDMC.
+# Between vegetative and flowering height, we removed flowering height because the experiment focuses on leaves.
+
+traits_data_2 <- data |>
+  filter(proj_2025 == "Traits") |>
+  select(height_vegetative, leaf_area, SLA, LDMC)
+
+corr_matrix = round(cor(traits_data_2, use = "complete.obs"), 2) #ignoring NA
+ggcorrplot(corr_matrix, hc.order = TRUE, type = "lower", lab = TRUE)
+
+# four variables left for the model
 
 ```
