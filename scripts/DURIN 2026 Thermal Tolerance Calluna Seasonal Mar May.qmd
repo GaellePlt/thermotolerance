@@ -21,6 +21,8 @@ library(readr) # Data importation functions
 library(stringr) # String and character text
 library(future) # Using severals cores at the same time
 library(lme4) # Lineare Mixed Model with Nested effects
+library(FactoMineR)
+library(factoextra)
 ```
 
 March data
@@ -1438,25 +1440,60 @@ ggplot(aes(x = age_class,
 8.  Bonus : Post-hoc diagnostic testing and R-squared calculation
 
 ```{r}
-#| label: LMM-htol 
-
-# How does season, age class and their interaction impact T50?
-# H1 - response (T50) ~ age class * season 
-
-TTHot_wide_plant <- TTHot_wide_plant |>  
-  na.omit()
-
-model_htol_1 <- lmer(estimate ~ age_class * month + # Fixed effects; dependant
-        (1 | age_class/plant_nr), # Random effect: we have a random effect (plant_nr) nested within a fixed effect (age_class).
-        data = TTHot_wide_plant)
-# table(TTHot_wide_plant$age_class, TTHot_wide_plant$month) --> 0 fro BUI and MAT for March --> removed because no T50 curves
-
-isSingular(model_htol_1) # TRUE...
-
-summary(model_htol_1)
+# #| label: LMM-htol 
+# 
+# # How does season, age class and their interaction impact T50?
+# # H1 - response (T50) ~ age class * season 
+# 
+# TTHot_wide_plant <- TTHot_wide_plant |>  
+#   na.omit()
+# 
+# model_htol_1 <- lmer(estimate ~ age_class * month + # Fixed effects; dependant
+#         (1 | age_class/plant_nr), # Random effect: we have a random effect (plant_nr) nested within a fixed effect (age_class).
+#         data = TTHot_wide_plant)
+# # table(TTHot_wide_plant$age_class, TTHot_wide_plant$month) --> 0 fro BUI and MAT for March --> removed because no T50 curves
+# 
+# isSingular(model_htol_1) # TRUE...
+# 
+# summary(model_htol_1)
 ```
 
-## Linear model
+## ANOVA model
+
+```{r}
+#| label: ANOVA-for-NB-and-PIO
+
+TTHot_wide_NB_PIO_old <- TTHot_wide_plant |> 
+  filter(age_class %in% c("Newly Burnt", "Pioneer")) |> 
+  filter(leaf_age %in% c("old")) |> 
+  filter(metric %in% c("T50"))
+
+modele_s_a_1 <- aov(estimate ~ month * age_class, data = TTHot_wide_NB_PIO_old)
+
+summary(modele_s_a_1)
+
+## Vérification des hypothèses
+# indépendance : oui, ce sont des plantes différentes
+plot(modele_s_a_1)
+# normalité : QQ-plot, non validé
+# homoscédasticité : residuals vs fitted, validé 
+```
+
+```{r}
+#| label: box-plot
+
+ggplot(TTHot_wide_NB_PIO_old, aes(x = month, y = estimate, fill = month)) +
+  geom_violin(alpha = 0.5, trim = FALSE) +
+  geom_boxplot(width = 0.1, fill = "white", outlier.shape = NA) + 
+  geom_jitter(width = 0.1, size = 1.5, alpha = 0.7, color = "black") + 
+  theme_minimal() +
+  labs(
+    title = "Distribution de la T50 selon le mois",
+    x = "Mois de collecte",
+    y = "T50"
+  ) +
+  theme(legend.position = "none")
+```
 
 # Effect of traits on T50
 
