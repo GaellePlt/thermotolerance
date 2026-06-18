@@ -21,8 +21,6 @@ library(readr) # Data importation functions
 library(stringr) # String and character text
 library(future) # Using severals cores at the same time
 library(lme4) # Lineare Mixed Model with Nested effects
-library(FactoMineR)
-library(factoextra)
 ```
 
 March data
@@ -1477,6 +1475,17 @@ summary(modele_s_a_1)
 plot(modele_s_a_1)
 # normalité : QQ-plot, non validé
 # homoscédasticité : residuals vs fitted, validé 
+
+## transformation log
+modele_s_a_2 <- aov(log(estimate) ~ month * age_class, data = TTHot_wide_NB_PIO_old)
+
+summary(modele_s_a_2)
+
+## Vérification des hypothèses
+# indépendance : oui, ce sont des plantes différentes
+plot(modele_s_a_2)
+# normalité : QQ-plot, non validé
+# homoscédasticité : residuals vs fitted, validé
 ```
 
 ```{r}
