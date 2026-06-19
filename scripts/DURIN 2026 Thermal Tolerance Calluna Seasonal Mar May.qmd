@@ -21,6 +21,7 @@ library(readr) # Data importation functions
 library(stringr) # String and character text
 library(future) # Using severals cores at the same time
 library(lme4) # Lineare Mixed Model with Nested effects
+library(car) # GLM model
 ```
 
 March data
@@ -1486,20 +1487,101 @@ summary(modele_s_a_2)
 plot(modele_s_a_2)
 # normalité : QQ-plot, non validé
 # homoscédasticité : residuals vs fitted, validé
+
+library(car)
+
+# Ajustement du GLM adapté aux données asymétriques et bornées
+modele_glm <- glm(estimate ~ month * age_class, 
+                  data = TTHot_wide_NB_PIO_old, 
+                  family = Gamma(link = "log"))
+
+# Test des effets (équivalent du tableau d'ANOVA)
+Anova(modele_glm, type = "III")
+
+plot(modele_glm, which = c(1, 2))
+summary(modele_glm)
+```
+
+## GLM model
+
+### Model Rationale
+
+-   **Data Constraints:** Upper-bound ceiling effect (\~50°C in March) + strong heteroscedasticity (low variance in March, high variance in May).
+
+-   ANOVA : no normality
+
+### GLM ( Generalized Linear Model)
+
+-   Error Distribution (Family): Gamma. Handles skewness inherently. Variance changes as a function of the mean (models the physiological ceiling and May's variance expansion).
+
+-   Linear Predictor: `month * age_class`
+
+-   Link Function: Log. Biological standard for Gamma distribution.
+
+### Assumptions
+
+#### I. Linearity on the Link Scale
+
+-   Concept: Linear relationship between predictors and the log-transformed mean.
+
+-   Verification: Residuals vs. Fitted plot. Flat, horizontal red trendline around $0$ (log-link trend captured). "Triangle" or "banded" dispersion pattern (perfectly typical for Gamma distribution).
+
+#### II. Independence of Observations
+
+-   Concept: Independent biological replicates.
+
+-   Verification: Experimental design. Distinct, separate plants for each measurement.
+
+#### III. Correct Variance Specification (No Overdispersion)
+
+-   Concept: Real data variance matches the Gamma family structure.
+
+-   Verification: Formula check from model summary:
+
+    Dispersion Ratio = Residual Deviance / Degrees of Freedom \< 1-1.5
+
+#### IV. Absence of Influential Outliers
+
+-   Verification: Q-Q Residuals
+
+```{r}
+#| label: GLM-March-May-old-NB-PIO
+
+# In March, only leaves from the previous year (2025, classified as "old") were available. Although new leaves had emerged by May ("young"), the analysis was restricted to the 2025 cohort ("old") to ensure physiological comparability between the two sampling months.
+
+# The "Building" and "Mature" age classes were excluded from the analysis. In March, individuals from these cohorts suffered total mortality prior to measurements, preventing any estimation of their T50. Consequently, this study focuses exclusively on the "Newly Burnt" and "Pioneer" classes.
+
+
+modele_1 <- glm(estimate ~ month * age_class, 
+                  data = TTHot_wide_NB_PIO_old, 
+                  family = Gamma(link = "log"))
+
+
+Anova(modele_1, type = "III")
+
+
+# Verification assumptions
+
+plot(modele_1, which = c(1, 2))
+summary(modele_1)
+
+# 1. OK
+# 3. OK
+# 4. OK
 ```
 
 ```{r}
 #| label: box-plot
-
+#| warning: false
 ggplot(TTHot_wide_NB_PIO_old, aes(x = month, y = estimate, fill = month)) +
-  geom_violin(alpha = 0.5, trim = FALSE) +
-  geom_boxplot(width = 0.1, fill = "white", outlier.shape = NA) + 
+  geom_violin(alpha = 0.2, trim = FALSE) +
+  geom_boxplot(width = 0.1, alpha = 1, outlier.shape = NA, color = "grey30") + 
   geom_jitter(width = 0.1, size = 1.5, alpha = 0.7, color = "black") + 
   theme_minimal() +
   labs(
-    title = "Distribution de la T50 selon le mois",
-    x = "Mois de collecte",
-    y = "T50"
+    title = "Distribution of T50 by Month",
+    x = "Month",
+    y = "T50 (°C)"
   ) +
   theme(legend.position = "none")
 ```
