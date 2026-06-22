@@ -22,6 +22,7 @@ library(stringr) # String and character text
 library(future) # Using severals cores at the same time
 library(lme4) # Lineare Mixed Model with Nested effects
 library(car) # GLM model
+library(ggcorrplot)
 ```
 
 March data
@@ -1414,160 +1415,53 @@ ggplot(aes(x = age_class,
 
 # Effect of age classe, season and their interaction on T50
 
-## Lineare Mixed Model with Nested effects:
-
--   Fixed effects: age_class, month
-
--   Random effect: random effect (plant_nr) nested within a fixed effect (age_class)
-
-### /!\\ Assumptions to verify for an LMM
-
-1.  Normality of residuals
-
-2.  Homoscedasticity (Equal variance of residuals)
-
-3.  Independence of residuals
-
-4.  Normality of random effects
-
-5.  Correct specification of the random effects structure
-
-6.  Absence of multicollinearity (Among fixed effects)
-
-7.  Linearity (For fixed effects relationships)
-
-8.  Bonus : Post-hoc diagnostic testing and R-squared calculation
+## Hot T50
 
 ```{r}
-# #| label: LMM-htol 
-# 
-# # How does season, age class and their interaction impact T50?
-# # H1 - response (T50) ~ age class * season 
-# 
-# TTHot_wide_plant <- TTHot_wide_plant |>  
-#   na.omit()
-# 
-# model_htol_1 <- lmer(estimate ~ age_class * month + # Fixed effects; dependant
-#         (1 | age_class/plant_nr), # Random effect: we have a random effect (plant_nr) nested within a fixed effect (age_class).
-#         data = TTHot_wide_plant)
-# # table(TTHot_wide_plant$age_class, TTHot_wide_plant$month) --> 0 fro BUI and MAT for March --> removed because no T50 curves
-# 
-# isSingular(model_htol_1) # TRUE...
-# 
-# summary(model_htol_1)
-```
+#| label: Create-data-frame-March-May-NB_PIO_old
 
-## ANOVA model
-
-```{r}
-#| label: ANOVA-for-NB-and-PIO
-
-TTHot_wide_NB_PIO_old <- TTHot_wide_plant |> 
-  filter(age_class %in% c("Newly Burnt", "Pioneer")) |> 
-  filter(leaf_age %in% c("old")) |> 
+TTHot_wide_NB_PIO_old <- TTHot_wide_plant |>
+  filter(age_class %in% c("Newly Burnt", "Pioneer")) |>
+  filter(leaf_age %in% c("old")) |>
   filter(metric %in% c("T50"))
-
-modele_s_a_1 <- aov(estimate ~ month * age_class, data = TTHot_wide_NB_PIO_old)
-
-summary(modele_s_a_1)
-
-## Vérification des hypothèses
-# indépendance : oui, ce sont des plantes différentes
-plot(modele_s_a_1)
-# normalité : QQ-plot, non validé
-# homoscédasticité : residuals vs fitted, validé 
-
-## transformation log
-modele_s_a_2 <- aov(log(estimate) ~ month * age_class, data = TTHot_wide_NB_PIO_old)
-
-summary(modele_s_a_2)
-
-## Vérification des hypothèses
-# indépendance : oui, ce sont des plantes différentes
-plot(modele_s_a_2)
-# normalité : QQ-plot, non validé
-# homoscédasticité : residuals vs fitted, validé
-
-library(car)
-
-# Ajustement du GLM adapté aux données asymétriques et bornées
-modele_glm <- glm(estimate ~ month * age_class, 
-                  data = TTHot_wide_NB_PIO_old, 
-                  family = Gamma(link = "log"))
-
-# Test des effets (équivalent du tableau d'ANOVA)
-Anova(modele_glm, type = "III")
-
-plot(modele_glm, which = c(1, 2))
-summary(modele_glm)
 ```
 
-## GLM model
-
-### Model Rationale
-
--   **Data Constraints:** Upper-bound ceiling effect (\~50°C in March) + strong heteroscedasticity (low variance in March, high variance in May).
-
--   ANOVA : no normality
-
-### GLM ( Generalized Linear Model)
-
--   Error Distribution (Family): Gamma. Handles skewness inherently. Variance changes as a function of the mean (models the physiological ceiling and May's variance expansion).
-
--   Linear Predictor: `month * age_class`
-
--   Link Function: Log. Biological standard for Gamma distribution.
-
-### Assumptions
-
-#### I. Linearity on the Link Scale
-
--   Concept: Linear relationship between predictors and the log-transformed mean.
-
--   Verification: Residuals vs. Fitted plot. Flat, horizontal red trendline around $0$ (log-link trend captured). "Triangle" or "banded" dispersion pattern (perfectly typical for Gamma distribution).
-
-#### II. Independence of Observations
-
--   Concept: Independent biological replicates.
-
--   Verification: Experimental design. Distinct, separate plants for each measurement.
-
-#### III. Correct Variance Specification (No Overdispersion)
-
--   Concept: Real data variance matches the Gamma family structure.
-
--   Verification: Formula check from model summary:
-
-    Dispersion Ratio = Residual Deviance / Degrees of Freedom \< 1-1.5
-
-#### IV. Absence of Influential Outliers
-
--   Verification: Q-Q Residuals
-
 ```{r}
-#| label: GLM-March-May-old-NB-PIO
+#| label: LM-March-May-old-NB-PIO
 
 # In March, only leaves from the previous year (2025, classified as "old") were available. Although new leaves had emerged by May ("young"), the analysis was restricted to the 2025 cohort ("old") to ensure physiological comparability between the two sampling months.
 
 # The "Building" and "Mature" age classes were excluded from the analysis. In March, individuals from these cohorts suffered total mortality prior to measurements, preventing any estimation of their T50. Consequently, this study focuses exclusively on the "Newly Burnt" and "Pioneer" classes.
 
 
-modele_1 <- glm(estimate ~ month * age_class, 
-                  data = TTHot_wide_NB_PIO_old, 
-                  family = Gamma(link = "log"))
+modele_lm_1 <- lm(estimate ~ month * age_class, data = TTHot_wide_NB_PIO_old)
+
+# type = "II": Adjusts the ANOVA for an unbalanced design (unequal sample sizes due to NAs) by testing each main effect independently of the order of factors.
+
+# white.adjust = "hc3": Applies White's correction (HC3) to account for heteroscedasticity (unstable residual variance in May), ensuring robust p-values for small sample sizes.
+
+# Assumption for white.adjust: independance --> ok 
+
+print(Anova(modele_lm_1, type = "II", white.adjust = "hc3"))
 
 
-Anova(modele_1, type = "III")
+```
 
+```{r}
+#| label: interraction-plot
+#| warning: false
 
-# Verification assumptions
-
-plot(modele_1, which = c(1, 2))
-summary(modele_1)
-
-# 1. OK
-# 3. OK
-# 4. OK
+with(TTHot_wide_NB_PIO_old, interaction.plot(
+  x.factor = month, 
+  trace.factor = age_class, 
+  response = estimate,
+  fun = function(x) mean(x, na.rm = TRUE),
+  ylab = "T50 (°C)",
+  xlab = "Month",
+  trace.label = "Age class",
+  col = c("firebrick", "dodgerblue3"),
+  lwd = 2
+))
 ```
 
 ```{r}
@@ -1583,8 +1477,22 @@ ggplot(TTHot_wide_NB_PIO_old, aes(x = month, y = estimate, fill = month)) +
     x = "Month",
     y = "T50 (°C)"
   ) +
+  stat_summary(
+  aes(group = month),
+  fun.data = function(y) {
+    data.frame(y = 30, label = paste0("n = ", length(y)))
+  },
+  geom = "text",
+  color = "grey40",
+  size = 3.2,
+  vjust = 0
+  ) +
   theme(legend.position = "none")
 ```
+
+## Cold T50
+
+not possible yet with the data of March and May
 
 # Effect of traits on T50
 
@@ -1605,10 +1513,9 @@ united_columns_traits_plante <- unite(
   remove = TRUE
 ) |> 
   na.omit()
-
 ```
 
-## Effect of traits on Hot T50
+## Hot T50
 
 ```{r}
 #| label: Create-joint-data-frame-HT50-traits
@@ -1658,8 +1565,6 @@ joint_traits_HT50_scaled <- joint_traits_HT50_wide |>
 ```{r}
 #| label: Correlation-between-traits
 
-library(ggcorrplot)
-
 traits_data_corr <- traits_data|>
   select(height_flower, height_vegetative, dry_mass, wet_mass, leaf_area, SLA, LDMC)
 
@@ -1682,6 +1587,6 @@ traits_data_2 <- data |>
 corr_matrix = round(cor(traits_data_2, use = "complete.obs"), 2) #ignoring NA
 ggcorrplot(corr_matrix, hc.order = TRUE, type = "lower", lab = TRUE)
 
-# four variables left for the model
+# Four variables left for the model
 
 ```
