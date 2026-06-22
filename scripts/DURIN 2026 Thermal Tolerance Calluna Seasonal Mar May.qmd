@@ -1428,6 +1428,7 @@ TTHot_wide_NB_PIO_old <- TTHot_wide_plant |>
 
 ```{r}
 #| label: LM-March-May-old-NB-PIO
+#| fig-height: 10
 
 # In March, only leaves from the previous year (2025, classified as "old") were available. Although new leaves had emerged by May ("young"), the analysis was restricted to the 2025 cohort ("old") to ensure physiological comparability between the two sampling months.
 
@@ -1435,15 +1436,15 @@ TTHot_wide_NB_PIO_old <- TTHot_wide_plant |>
 
 
 modele_lm_1 <- lm(estimate ~ month * age_class, data = TTHot_wide_NB_PIO_old)
-
+performance::check_model(modele_lm_1)
+plot(modele_lm_1)
 # type = "II": Adjusts the ANOVA for an unbalanced design (unequal sample sizes due to NAs) by testing each main effect independently of the order of factors.
 
-# white.adjust = "hc3": Applies White's correction (HC3) to account for heteroscedasticity (unstable residual variance in May), ensuring robust p-values for small sample sizes.
+# white.adjust = "hc3": Applies White's correction (HC3) to account for heteroscedasticity (unstable residual variance in May), ensuring robust p-values for small sample sizes. https://bsapubs.onlinelibrary.wiley.com/doi/epdf/10.1002/ajb2.16464
 
 # Assumption for white.adjust: independance --> ok 
 
-print(Anova(modele_lm_1, type = "II", white.adjust = "hc3"))
-
+print(Anova(modele_lm_1, type = "II")) #, white.adjust = "hc3" # mois très significatif quand on l'enlève
 
 ```
 
@@ -1589,4 +1590,31 @@ ggcorrplot(corr_matrix, hc.order = TRUE, type = "lower", lab = TRUE)
 
 # Four variables left for the model
 
+```
+
+```{r}
+#| label: Correlation-matrix-of-functional-traits-and-T50
+#| warning: false
+
+# if(!require(GGally)) install.packages("GGally")
+# if(!require(ggplot2)) install.packages("ggplot2")
+
+library(GGally)
+
+
+traits_HT50 <- joint_traits_HT50_wide[, c("estimate", "SLA", "height_vegetative", "leaf_area", "LDMC")]
+
+
+ggpairs(
+  traits_HT50,
+  upper = list(continuous = wrap("cor", method = "pearson", size = 4.5)),
+  diag = list(continuous = wrap("densityDiag", fill = "lightgray", alpha = 0.5)),
+  lower = list(continuous = wrap("smooth", method = "lm", color = "blue", alpha = 0.3, size = 0.5))
+) +
+theme_bw() + 
+labs(title = "Correlation matrix of functional traits and T50") +
+theme(
+  strip.text = element_text(size = 11, face = "bold"), 
+  plot.title = element_text(hjust = 0.5, face = "bold", size = 14)
+)
 ```
