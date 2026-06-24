@@ -16,16 +16,14 @@ library(dplyr)
 
 ## Calculate Leaf Area
 
-/!\\ some of the stems disappear when the image is in black and white
-
 ```{r}
 #| label: Cutting the images to have only the leaf
 
 library(magick)
 
 # files
-source_file <- "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/scans/Vm_april2026"
-dest_file   <- "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/scans/Vm_april2026/leaf"
+source_file <- "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/scans/Vm_june2026"
+dest_file   <- "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/scans/Vm_june2026/leaf"
 
 # listing .jpeg files
 list_file <- list.files(source_file, 
@@ -123,11 +121,11 @@ loop.files <-  function(files) {
 # A default address could be 'raw_data/leaf_scans/DURIN_leaf_scans/
 
 # The folder with the scan images
-list.of.files <- dir(path = paste0("C:/Users/poula/Documents/M2_PAMEQ/Stage M2/scans/Vm_april2026/leaf/"), pattern = "jpeg|jpg", recursive = TRUE, full.names = TRUE)
+list.of.files <- dir(path = paste0("C:/Users/poula/Documents/M2_PAMEQ/Stage M2/scans/Vm_june2026/leaf/"), pattern = "jpeg|jpg", recursive = TRUE, full.names = TRUE)
 # A default Temp folder that can be created as it's processing
-new.folder <- "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/scans/Vm_april2026/leaf/Temp"
+new.folder <- "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/scans/Vm_june2026/leaf/Temp"
 # Where you want the thresholded images to be saved, and also the output csv
-output.folder <- "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/scans/Vm_april2026/leaf/output_leaf/" 
+output.folder <- "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/scans/Vm_june2026/leaf/output_leaf/" 
 
 # Run function
 # Returns a dataframe with each particle and it's area, using a concatenated ID
@@ -146,7 +144,7 @@ leaf_area <- LeafArea.raw_total |>
 
 # save data as csv
 dim(leaf_area) # check you have the correct number of rows to match input images
-write.csv(leaf_area, file = "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/scans/Vm_april2026/leaf/output_leaf/DURIN_Vm_leaf_area_2026.csv")
+write.csv(leaf_area, file = "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/scans/Vm_june2026/leaf/output_leaf/DURIN_Vm_leaf_area_2026.csv")
 ```
 
 ## Calculate Old Stem Area
@@ -157,8 +155,8 @@ write.csv(leaf_area, file = "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/scans/Vm
 library(magick)
 
 # files
-source_file <- "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/scans/Vm_april2026"
-dest_file   <- "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/scans/Vm_april2026/old_stem"
+source_file <- "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/scans/Vm_june2026"
+dest_file   <- "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/scans/Vm_june2026/old_stem"
 
 # listing .jpeg files
 list_file <- list.files(source_file, 
@@ -254,11 +252,11 @@ loop.files <-  function(files) {
 # A default address could be 'raw_data/leaf_scans/DURIN_leaf_scans/
 
 # The folder with the scan images
-list.of.files <- dir(path = paste0("C:/Users/poula/Documents/M2_PAMEQ/Stage M2/scans/Vm_april2026/old_stem/"), pattern = "jpeg|jpg", recursive = TRUE, full.names = TRUE)
+list.of.files <- dir(path = paste0("C:/Users/poula/Documents/M2_PAMEQ/Stage M2/scans/Vm_june2026/old_stem/old_stem_edited_images/"), pattern = "jpeg|jpg", recursive = TRUE, full.names = TRUE)
 # A default Temp folder that can be created as it's processing
-new.folder <- "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/scans/Vm_april2026/old_stem/Temp"
+new.folder <- "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/scans/Vm_june2026/old_stem/old_stem_edited_images/Temp"
 # Where you want the thresholded images to be saved, and also the output csv
-output.folder <- "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/scans/Vm_april2026/old_stem/output_old_stem/" 
+output.folder <- "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/scans/Vm_june2026/old_stem/old_stem_edited_images/output_old_stem_edited_images/" 
 
 # Run function
 # Returns a dataframe with each particle and it's area, using a concatenated ID
@@ -277,7 +275,7 @@ leaf_area <- LeafArea.raw_total |>
 
 # save data as csv
 dim(leaf_area) # check you have the correct number of rows to match input images
-write.csv(leaf_area, file = "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/scans/Vm_april2026/old_stem/output_old_stem/DURIN_Vm_old_stem_area_2026.csv")
+write.csv(leaf_area, file = "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/scans/Vm_june2026/old_stem/old_stem_edited_images/output_old_stem_edited_images/DURIN_Vm_old_stem_area-edited_images_2026.csv")
 ```
 
 ## Calculate Young Stem Area
@@ -288,8 +286,8 @@ write.csv(leaf_area, file = "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/scans/Vm
 library(magick)
 
 # files
-source_file <- "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/scans/Vm_april2026"
-dest_file   <- "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/scans/Vm_april2026/young_stem"
+source_file <- "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/scans/Vm_june2026"
+dest_file   <- "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/scans/Vm_june2026/young_stem"
 
 # listing .jpeg files
 list_file <- list.files(source_file, 
@@ -305,6 +303,7 @@ lapply(list_file, function(chemin) {
   # cutting set up
   top_cut <- 2900 
   bottom_cut  <- 10
+
   
   # height calculation
   final_height <- inf$height - top_cut - bottom_cut
@@ -338,7 +337,7 @@ loop.files <-  function(files) {
       distance.pixel = 236,
       known.distance = 2,
       log = TRUE,
-      low.size = 0.01, # lower than the old stems or leaves because it removes young stems
+      low.size = 0.05,
       trim.pixel = 100,
       trim.pixel.right = 250,
       trim.pixel.top = 0, # removing the enveloppe
@@ -385,11 +384,11 @@ loop.files <-  function(files) {
 # A default address could be 'raw_data/leaf_scans/DURIN_leaf_scans/
 
 # The folder with the scan images
-list.of.files <- dir(path = paste0("C:/Users/poula/Documents/M2_PAMEQ/Stage M2/scans/Vm_april2026/young_stem/"), pattern = "jpeg|jpg", recursive = TRUE, full.names = TRUE)
+list.of.files <- dir(path = paste0("C:/Users/poula/Documents/M2_PAMEQ/Stage M2/scans/Vm_june2026/young_stem/young_stem_edited_images/"), pattern = "jpeg|jpg", recursive = TRUE, full.names = TRUE)
 # A default Temp folder that can be created as it's processing
-new.folder <- "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/scans/Vm_april2026/young_stem/Temp"
+new.folder <- "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/scans/Vm_june2026/young_stem/young_stem_edited_images/Temp"
 # Where you want the thresholded images to be saved, and also the output csv
-output.folder <- "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/scans/Vm_april2026/young_stem/output_young_stem/" 
+output.folder <- "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/scans/Vm_june2026/young_stem/young_stem_edited_images/output_young_stem_edited_images/" 
 
 # Run function
 # Returns a dataframe with each particle and it's area, using a concatenated ID
@@ -408,5 +407,5 @@ leaf_area <- LeafArea.raw_total |>
 
 # save data as csv
 dim(leaf_area) # check you have the correct number of rows to match input images
-write.csv(leaf_area, file = "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/scans/Vm_april2026/young_stem/output_young_stem/DURIN_Vm_young_stem_area_2026.csv")
+write.csv(leaf_area, file = "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/scans/Vm_june2026/young_stem/young_stem_edited_images/output_young_stem_edited_images/DURIN_Vm_young_stem_area_edited_images_2026.csv")
 ```
