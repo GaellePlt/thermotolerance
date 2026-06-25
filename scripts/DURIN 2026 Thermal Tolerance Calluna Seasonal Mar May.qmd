@@ -1417,6 +1417,8 @@ ggplot(aes(x = age_class,
 
 ## Hot T50
 
+### March-May-NB_PIO_old
+
 ```{r}
 #| label: Create-data-frame-March-May-NB_PIO_old
 
@@ -1437,7 +1439,6 @@ TTHot_wide_NB_PIO_old <- TTHot_wide_plant |>
 
 modele_lm_1 <- lm(estimate ~ month * age_class, data = TTHot_wide_NB_PIO_old)
 performance::check_model(modele_lm_1)
-plot(modele_lm_1)
 # type = "II": Adjusts the ANOVA for an unbalanced design (unequal sample sizes due to NAs) by testing each main effect independently of the order of factors.
 
 # white.adjust = "hc3": Applies White's correction (HC3) to account for heteroscedasticity (unstable residual variance in May), ensuring robust p-values for small sample sizes. https://bsapubs.onlinelibrary.wiley.com/doi/epdf/10.1002/ajb2.16464
@@ -1563,20 +1564,31 @@ joint_traits_HT50_scaled <- joint_traits_HT50_wide |>
 
 ```
 
+### March, May, NB, PIO, old
+
+```{r}
+#| label: Create-data-frame-HT50
+
+joint_traits_HT50_NB_PIO_old <- joint_traits_HT50_wide |>
+  filter(age_class %in% c("Newly Burnt", "Pioneer")) |>
+  filter(leaf_age %in% c("old"))
+
+```
+
 ```{r}
 #| label: Correlation-between-traits
 
-traits_data_corr <- traits_data|>
+traits_data_corr <- joint_traits_HT50_NB_PIO_old |>
   select(height_flower, height_vegetative, dry_mass, wet_mass, leaf_area, SLA, LDMC)
 
 corr_matrix = round(cor(traits_data_corr, use = "complete.obs"), 2) #ignoring NA
 ggcorrplot(corr_matrix, hc.order = TRUE, type = "lower", lab = TRUE)
 
-# Cut-off value : 0.80 --> literature
-# dry_mass and wet_mass : 0.89
-# leaf_area and dry_mass : 0.84
-# leaf_area and wet_mass : 0.81
-# height_flower and heigth_vegetative : 0.98
+# Cut-off value : 0.70 --> literature
+# dry_mass and wet_mass : 0.85
+# leaf_area and dry_mass : 0.76
+# leaf_area and wet_mass : 0.77
+# height_flower and heigth_vegetative : 0.95
 
 # We removed wet and dry mass because they are correlated with leaf area and with each other, and they are already represented in the LDMC.
 # Between vegetative and flowering height, we removed flowering height because the experiment focuses on leaves.
@@ -1589,32 +1601,102 @@ corr_matrix = round(cor(traits_data_2, use = "complete.obs"), 2) #ignoring NA
 ggcorrplot(corr_matrix, hc.order = TRUE, type = "lower", lab = TRUE)
 
 # Four variables left for the model
+```
 
+#### Trait-by-trait models
+
+```{r}
+#| label: SLA ~ age_class * month
+#| fig-height: 10
+
+mod_SLA  <- lm(SLA ~ age_class * month, data = joint_traits_HT50_NB_PIO_old)
+performance::check_model(mod_SLA)
+
+anova(mod_SLA)
+
+# 1. Normality (Q-Q Plot): Valid. Most residuals follow the line well. 
+#    Minor deviation at the upper tail (plants 77, 87, 89) but nothing critical.
+# 2. Homoscedasticity: Valid. Residuals are evenly distributed across groups 
+#    (the reference line remains flat and horizontal).
+# 3. Collinearity: Low (VIF < 5 for all terms).
 ```
 
 ```{r}
+#| label: LDMC ~ age_class * month
+#| fig-height: 10
+mod_LDMC <- lm(LDMC ~ age_class * month, data = joint_traits_HT50_NB_PIO_old)
+performance::check_model(mod_LDMC)
+
+anova(mod_LDMC)
+
+# 1. Normality (Q-Q Plot): Valid. Residuals follow the line.
+# 2. Homoscedasticity: Valid. Residuals show a stable distribution across groups
+#    (the reference line is slightly curved but acceptable).
+# 3. Collinearity: Low (VIF < 5 for all terms). 
+```
+
+```{r}
+#| label: leaf_area ~ age_class * month
+#| fig-height: 10
+mod_LA   <- lm(leaf_area ~ age_class * month, data = joint_traits_HT50_NB_PIO_old)
+performance::check_model(mod_LA)
+
+anova(mod_LA)
+
+# 1. Normality (Q-Q Plot): Valid. Residuals follow the line closely, with a very slight deviation at the right tail, which is acceptable.
+# 2. Homoscedasticity: Valid. Uniform spread of residuals across fitted values 
+#    (the reference line is straight and horizontal).
+# 3. Collinearity: Low (VIF < 5). 
+```
+
+```{r}
+#| label: height_vegetative ~ age_class * month
+#| fig-height: 10
+mod_hveg <- lm(height_vegetative ~ age_class * month, data = joint_traits_HT50_NB_PIO_old)
+performance::check_model(mod_hveg)
+
+anova(mod_hveg)
+
+# 1. Normality (Q-Q Plot): Valid. Residuals follow the reference line.
+# 2. Homoscedasticity: Valid. Residual distribution is stable (the slight upward 
+#    curve at the right edge is minor and acceptable given the extreme F-value).
+# 3. Collinearity: Low (VIF < 5). No issues.
+
+# Note on F-value (1659.4): explain by the height difference between Newly Burnt (small resprouts) and Pioneer (tall bushes) 
+```
+
+**Summary of Univariate ANOVA Models on Functional Traits**
+
+| Functional Trait | Age Class Effect (`age_class`) | Season Effect (`month`) | Interaction Effect (`Age x Month`) |
+|:-----------------|:----------------:|:----------------:|:----------------:|
+| SLA (Specific Leaf Area) | Ultra-significant (\*\*\*) | Very significant (\*\*\*) | Non-significant |
+| LDMC (Leaf Dry Matter Content) | Non-significant | Ultra-significant (\*\*\*) | Non-significant |
+| Leaf Area | Ultra-significant (\*\*\*) | Marginal / Tendency (.) | Non-significant |
+| Height (Vegetative) | Stratospheric (\*\*\*) | Ultra-significant (\*\*\*) | Highly significant (\*\*\*) |
+
+```{r}
 #| label: Correlation-matrix-of-functional-traits-and-T50
-#| warning: false
-
-# if(!require(GGally)) install.packages("GGally")
-# if(!require(ggplot2)) install.packages("ggplot2")
-
-library(GGally)
-
-
-traits_HT50 <- joint_traits_HT50_wide[, c("estimate", "SLA", "height_vegetative", "leaf_area", "LDMC")]
-
-
-ggpairs(
-  traits_HT50,
-  upper = list(continuous = wrap("cor", method = "pearson", size = 4.5)),
-  diag = list(continuous = wrap("densityDiag", fill = "lightgray", alpha = 0.5)),
-  lower = list(continuous = wrap("smooth", method = "lm", color = "blue", alpha = 0.3, size = 0.5))
-) +
-theme_bw() + 
-labs(title = "Correlation matrix of functional traits and T50") +
-theme(
-  strip.text = element_text(size = 11, face = "bold"), 
-  plot.title = element_text(hjust = 0.5, face = "bold", size = 14)
-)
+# #| warning: false
+# 
+# # if(!require(GGally)) install.packages("GGally")
+# # if(!require(ggplot2)) install.packages("ggplot2")
+# 
+# library(GGally)
+# 
+# 
+# traits_HT50 <- joint_traits_HT50_NB_PIO_old[, c("estimate", "SLA", "height_vegetative", "leaf_area", "LDMC")]
+# 
+# 
+# ggpairs(
+#   traits_HT50,
+#   upper = list(continuous = wrap("cor", method = "pearson", size = 4.5)),
+#   diag = list(continuous = wrap("densityDiag", fill = "lightgray", alpha = 0.5)),
+#   lower = list(continuous = wrap("smooth", method = "lm", color = "blue", alpha = 0.3, size = 0.5))
+# ) +
+# theme_bw() + 
+# labs(title = "Correlation matrix of functional traits and T50") +
+# theme(
+#   strip.text = element_text(size = 11, face = "bold"), 
+#   plot.title = element_text(hjust = 0.5, face = "bold", size = 14)
+# )
 ```
