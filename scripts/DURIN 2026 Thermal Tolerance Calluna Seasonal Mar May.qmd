@@ -1567,11 +1567,22 @@ joint_traits_HT50_scaled <- joint_traits_HT50_wide |>
 ### March, May, NB, PIO, old
 
 ```{r}
-#| label: Create-data-frame-HT50
+#| label: Create-data-frame
 
 joint_traits_HT50_NB_PIO_old <- joint_traits_HT50_wide |>
   filter(age_class %in% c("Newly Burnt", "Pioneer")) |>
   filter(leaf_age %in% c("old"))
+
+```
+
+```{r}
+#| label: Create-scaled-data-frame
+
+joint_traits_HT50_NB_PIO_old_scaled <- joint_traits_HT50_NB_PIO_old |> 
+  mutate(
+    across(c(height_flower, height_vegetative, leaf_area, wet_mass, dry_mass, SLA, LDMC), ~ as.numeric(as.character(.x))),
+    across(c(height_flower, height_vegetative, leaf_area, wet_mass, dry_mass, SLA, LDMC), ~ as.numeric(scale(.x)), .names = "{.col}_scaled")
+  )
 
 ```
 
@@ -1601,6 +1612,16 @@ corr_matrix = round(cor(traits_data_2, use = "complete.obs"), 2) #ignoring NA
 ggcorrplot(corr_matrix, hc.order = TRUE, type = "lower", lab = TRUE)
 
 # Four variables left for the model
+```
+
+```{r}
+#| label: Data-frame
+
+joint_traits_HT50_NB_PIO_old <- joint_traits_HT50_NB_PIO_old |>
+  select(-c(height_flower, wet_mass, dry_mass))
+
+joint_traits_HT50_NB_PIO_old_scaled <- joint_traits_HT50_NB_PIO_old_scaled |>
+  select(-c(height_flower, wet_mass, dry_mass))
 ```
 
 #### Trait-by-trait models
@@ -1673,6 +1694,33 @@ anova(mod_hveg)
 | LDMC (Leaf Dry Matter Content) | Non-significant | Ultra-significant (\*\*\*) | Non-significant |
 | Leaf Area | Ultra-significant (\*\*\*) | Marginal / Tendency (.) | Non-significant |
 | Height (Vegetative) | Stratospheric (\*\*\*) | Ultra-significant (\*\*\*) | Highly significant (\*\*\*) |
+
+#### Final model
+
+```{r}
+#| label: Final-model
+#| fig-height: 10
+
+mod_final_additif <- lm(estimate ~ SLA_scaled + leaf_area_scaled + LDMC_scaled + height_vegetative_scaled + month, data = joint_traits_HT50_NB_PIO_old_scaled) 
+
+
+mod_final_interaction <- lm(estimate ~ (SLA_scaled + leaf_area_scaled + LDMC_scaled + height_vegetative_scaled) * month, data = joint_traits_HT50_NB_PIO_old_scaled) 
+
+AIC(mod_final_additif, mod_final_interaction)
+
+# Le modèle avec interaction (mod_final_interaction) a un AIC plus bas de $8.66$ points par rapport au modèle additif.En statistiques (et plus particulièrement avec le critère de l'AIC), dès qu'une différence est supérieure à $2$ points, le modèle avec l'AIC le plus bas est considéré comme significativement meilleur. Une différence de près de $9$ points est donc un signal très fort.
+
+performance::check_model(mod_final_interaction)
+
+# 1. Normality (Q-Q Plot): Valid. Residuals follow the reference line tightly.
+# 2. Collinearity (VIF): Valid. Low to moderate VIF (< 6) across all terms, 
+#    which is exceptionally clean for a complex interaction model.
+# 3. Homoscedasticity: Acceptable. Minor hump in residual spread for intermediate 
+#    fitted values, but well within normal limits for ecological field data.
+# 4. Influential Observations: No overly influential outliers detected.
+
+summary(mod_final_interaction)
+```
 
 ```{r}
 #| label: Correlation-matrix-of-functional-traits-and-T50
