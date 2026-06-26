@@ -1194,6 +1194,7 @@ TTHot_plant_sum <- summary(TTHot_plant) # see summary output for T50 values (not
 
 autoplot(TTHot_plant) # plots logistic curves and dashed lines for Tcrit, T50, T95
 
+
 ```
 
 ```{r}
@@ -1636,6 +1637,11 @@ ggplot(TTHot_wide_NB_PIO_old, aes(
   vjust = 0
   ) +
   theme(legend.position = "none")
+
+# ggsave(
+#   filename = "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/Figures/Distribution of T50 by Month.png",
+#   width = 18, height = 12, units = "cm", dpi = 300
+# )
 ```
 
 ```{r}
@@ -1684,7 +1690,7 @@ ggplot(TTHot_wide_NB_PIO_old, aes(
   scale_fill_manual(values = c("Newly Burnt" = "#C77CFF", "Pioneer" = "#7CAE00")) +
   theme_minimal() +
   labs(
-    title = "Thermal Tolerance (T50) Evolution by Month and Age Class",
+    title = "T50 by month and age class",
     x = "Sampling Month", 
     y = "T50 (°C)",
     fill = "Age Class"
@@ -1701,6 +1707,11 @@ ggplot(TTHot_wide_NB_PIO_old, aes(
     vjust = 0
   ) +
   theme(legend.position = "right")
+
+# ggsave(
+#   filename = "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/Figures/Thermal Tolerance (T50) Evolution by Month and Age Class.png",
+#   width = 18, height = 12, units = "cm", dpi = 300
+# )
 ```
 
 ## Cold T50
