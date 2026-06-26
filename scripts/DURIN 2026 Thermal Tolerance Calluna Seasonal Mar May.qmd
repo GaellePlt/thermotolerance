@@ -8,7 +8,7 @@ editor: visual
 ## Import Data
 
 ```{r}
-#| label: loading libraries
+#| label: loading-libraries
 #| message: false 
 
 # installing / loading packages
@@ -28,7 +28,7 @@ library(ggcorrplot)
 March data
 
 ```{r}
-#| label: importing raw data of trait and fluorescence
+#| label: importing-raw-data-of-trait-and-fluorescence
 #| message: false 
 
 raw_data_mar <- read_excel(
@@ -38,7 +38,7 @@ raw_data_mar <- read_excel(
 ```
 
 ```{r}
-#| label: clean trait dataset to match DURIN formatting
+#| label: clean-trait-dataset-to-match-DURIN-formatting
 
 
 # Change some column names to snake_case standard
@@ -46,7 +46,7 @@ raw_data_mar <- read_excel(
 # Some information will be specific to traits, fluorescence etc.
 # using slice() to remove the first three row of example data (ALWAYS CHECK!)
 
-raw_data_mar <- raw_data_mar %>% 
+raw_data_mar <- raw_data_mar |> 
   # New name then old name of column, including snake case ('_' and lower letters)
   rename(site_name = siteID,
          age_class = ageClass,
@@ -61,7 +61,7 @@ raw_data_mar <- raw_data_mar %>%
          height_flower = 'height(s)_flower',
          height_vegetative = 'height(s)_top',
          treatment_date = TreatmentDate,
-         treatment_time = TreatmentTime) %>%  
+         treatment_time = TreatmentTime) |>  
   slice(-(1:3)) # Remove first three rows (excluding headers)
 
 
@@ -69,7 +69,7 @@ raw_data_mar <- raw_data_mar %>%
 glimpse(raw_data_mar)
 
 # Changing classes of all variables that should be in class factor
-raw_data_mar <- raw_data_mar %>%  
+raw_data_mar <- raw_data_mar |>  
   mutate(across(c(site_name, species, proj_2025, project, age_class, plant_nr, leaf_age, sample, paired_with, calluna_shoot_type, temp_exp, temp_exp_time, temp_exp_time_unit, fv_fm_hr, scanned), as.factor))
 
 
@@ -99,23 +99,23 @@ levels(raw_data_mar$age_class)
 # Convert collection time into proeper time format
 # removing the day and year columns, keep month for data cleaning checking for now
 
-raw_data_mar <- raw_data_mar %>% 
+raw_data_mar <- raw_data_mar |> 
   mutate(date  = ymd_hm(paste(year, month, day,
-                 format(collection_time, format = "%H:%M"))), .after = 1)  %>% 
+                 format(collection_time, format = "%H:%M"))), .after = 1)  |> 
   select(-c(day, year, collection_time)) 
 
 
 glimpse(raw_data_mar) 
 
 # To help with plotting, make month an ordered factor (more useful one more months)
-raw_data_mar <- raw_data_mar %>%
+raw_data_mar <- raw_data_mar |> 
   mutate(month = factor(month, levels = c("November", "January", "March")))
 
 # Create a unique plant_ID given age_class, month, and plant_nr
-raw_data_mar <- raw_data_mar %>%   # assuming you already created Month/date_day earlier
+raw_data_mar <- raw_data_mar |>   # assuming you already created Month/date_day earlier
   mutate(
     unique_plantID = paste(age_class, month, plant_nr, sep = "_")
-  )%>% 
+  ) |> 
   mutate(envelope_ID = case_when(
     grepl("ADDX1933", envelope_ID) ~ "ADX1933",
     grepl("AGS", envelope_ID) ~ "AGS4838",
@@ -126,7 +126,7 @@ raw_data_mar <- raw_data_mar %>%   # assuming you already created Month/date_day
 May data
 
 ```{r}
-#| label: importing raw data of trait and fluorescence
+#| label: importing-raw-data-of-trait-and-fluorescence
 #| message: false 
 
 raw_data_may <- read_excel(
@@ -136,7 +136,7 @@ raw_data_may <- read_excel(
 ```
 
 ```{r}
-#| label: clean trait dataset to match DURIN formatting
+#| label: clean-trait-dataset-to-match-DURIN-formatting
 
 
 # Change some column names to snake_case standard
@@ -144,7 +144,7 @@ raw_data_may <- read_excel(
 # Some information will be specific to traits, fluorescence etc.
 # using slice() to remove the first three row of example data (ALWAYS CHECK!)
 
-raw_data_may <- raw_data_may %>% 
+raw_data_may <- raw_data_may |> 
   # New name then old name of column, including snake case ('_' and lower letters)
   rename(site_name = siteID,
          age_class = ageClass,
@@ -159,7 +159,7 @@ raw_data_may <- raw_data_may %>%
          height_flower = 'height(s)_flower',
          height_vegetative = 'height(s)_top',
          treatment_date = TreatmentDate,
-         treatment_time = TreatmentTime) %>%  
+         treatment_time = TreatmentTime) |>  
   slice(-(1:3)) # Remove first three rows (excluding headers)
 
 
@@ -167,7 +167,7 @@ raw_data_may <- raw_data_may %>%
 glimpse(raw_data_may)
 
 # Changing classes of all variables that should be in class factor
-raw_data_may <- raw_data_may %>%  
+raw_data_may <- raw_data_may |>  
   mutate(across(c(site_name, species, proj_2025, project, age_class, plant_nr, leaf_age, sample, paired_with, calluna_shoot_type, temp_exp, temp_exp_time, temp_exp_time_unit, fv_fm_hr, scanned), as.factor))
 
 
@@ -197,20 +197,20 @@ levels(raw_data_may$age_class)
 # Convert collection time into proeper time format
 # removing the day and year columns, keep month for data cleaning checking for now
 
-raw_data_may <- raw_data_may %>% 
+raw_data_may <- raw_data_may |> 
   mutate(date  = ymd_hm(paste(year, month, day,
-                 format(collection_time, format = "%H:%M"))), .after = 1)  %>% 
+                 format(collection_time, format = "%H:%M"))), .after = 1)  |>  
   select(-c(day, year, collection_time)) 
 
 
 glimpse(raw_data_may) 
 
 # To help with plotting, make month an ordered factor (more useful one more months)
-raw_data_may <- raw_data_may %>%
+raw_data_may <- raw_data_may |> 
   mutate(month = factor(month, levels = c("November", "January", "March","May")))
 
 # Create a unique plant_ID given age_class, month, and plant_nr
-raw_data_may <- raw_data_may %>%   # assuming you already created Month/date_day earlier
+raw_data_may <- raw_data_may |>    # assuming you already created Month/date_day earlier
   mutate(
     unique_plantID = paste(age_class, month, plant_nr, sep = "_")
     )
@@ -219,7 +219,7 @@ raw_data_may <- raw_data_may %>%   # assuming you already created Month/date_day
 Entire dataset (March and May)
 
 ```{r}
-#| label: Merge March date frame and May data frame
+#| label: Merge-March-date-frame-and-May-data-frame
 
 raw_data <- bind_rows(raw_data_mar, raw_data_may)
 ```
@@ -227,39 +227,39 @@ raw_data <- bind_rows(raw_data_mar, raw_data_may)
 Leaf area dataset for March and May
 
 ```{r}
-#| label: import leaf area dataset tidy and match to trait dataset
+#| label: import-leaf-area-dataset-tidy-and-match-to-trait-dataset
 
 
 # Change this to your local repository where the four excel output files are stored
 leaf_area_dir <- "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/scans/cv_output/"
 
 # Import leaves from the directory where the files are saved, only .csv files, return the file paths (not just file names)
-leaf_area_raw <- list.files(leaf_area_dir, pattern = "\\.csv$", full.names = TRUE) %>%
+leaf_area_raw <- list.files(leaf_area_dir, pattern = "\\.csv$", full.names = TRUE) |> 
   # Give each element the name of the source file (remove directory path)
-  setNames(basename(.)) %>%
+  (\(x) setNames(x, basename(x)))() |>
   # Read each .csv file into R, combine into a single dataframe
   # Add an ID column, indicating the source file
   purrr::map_df(~ readr::read_csv(.x, show_col_types = FALSE), .id = "source_file")
 
 #leaf_area_raw has only 2 columnes and we have to separate them
-leaf_area_raw <- leaf_area_raw %>%
+leaf_area_raw <- leaf_area_raw |> 
   separate(
     col =  `number;ID;n;leaf_area`,          # The column to separate
     into = c("number", "ID", "n", "leaf_area"), # Names for the new columns
     sep = ";",            # The delimiter to use for splitting
-  )%>%
+  ) |> 
   #remove the column number
   select(-c(number))
 
 # Clean and summarize files to get leaf area per envelopeID
-leaf_area_raw <- leaf_area_raw %>%
-  dplyr::select(-dplyr::matches("^Unnamed")) %>%   # drop index col if present
+leaf_area_raw <- leaf_area_raw |> 
+  dplyr::select(-dplyr::matches("^Unnamed")) |>   # drop index col if present
   dplyr::mutate(
     # Create new column names, and/or update the datatype for a given column
     envelope_ID = str_trim(as.character(ID)),
     leaf_area_scanned_bulk_nr = as.numeric(n),
     leaf_area_sum = as.numeric(leaf_area)
-  ) %>%
+  ) |> 
   # remove old column, comments is deleted as should be in the trait datasheet area check tab
   select(-c(ID, n,leaf_area))
 
@@ -267,18 +267,18 @@ leaf_area_raw <- leaf_area_raw %>%
 
 
 # Choose correct value per envelope_ID based on the source file, i.e. edited or not
-leaf_area_clean <- leaf_area_raw %>% 
+leaf_area_clean <- leaf_area_raw |> 
   # Use the phrase 'edited_images' in the file name to prioritize
-  mutate(priority = if_else(str_detect(source_file, "edited_images"), 1, 2)) %>%  
-  arrange(envelope_ID, priority) %>%   # ordering so preferred rows come first
-  distinct(envelope_ID, .keep_all = TRUE) %>%   # keeping first row per ID
+  mutate(priority = if_else(str_detect(source_file, "edited_images"), 1, 2)) |>   
+  arrange(envelope_ID, priority) |>    # ordering so preferred rows come first
+  distinct(envelope_ID, .keep_all = TRUE) |>   # keeping first row per ID
   select(-priority) # removing helper column
 
 #ok! we have 165 enveloppes
 
 # Join the clean leaf area db to the main trait db by the envelope ID
-data <- raw_data %>%
-  dplyr::mutate(envelope_ID = stringr::str_trim(as.character(envelope_ID))) %>%
+data <- raw_data |> 
+  dplyr::mutate(envelope_ID = stringr::str_trim(as.character(envelope_ID))) |> 
   # Left join, keep values from x, and only matching rows in y (leaf_area_clean)
   dplyr::left_join(leaf_area_clean, by = "envelope_ID")
 
@@ -289,7 +289,7 @@ data <- raw_data %>%
 Above was cleaning of column names, formatting of variables etc. Now we need to identify any mistakes in the data entry, outliers etc.
 
 ```{r}
-#| label: standardize comments and remarks
+#| label: standardize-comments-and-remarks
 
 # Find unique comments in the dataset
 # unique(data$remark)
@@ -297,12 +297,13 @@ Above was cleaning of column names, formatting of variables etc. Now we need to 
 # Multiple comment strings in the column (EXAMPLE ONLY AT THE MOMENT!)
 ## first observation : some REMARKS are the same but with capital letters for example
 
-data <- data %>%
-  mutate(remark = tolower(remark))%>% #evrything is in small letter to remove all capital letter mistakes
+data <- data |> 
+  mutate(remark = tolower(remark)) |>  #evrything is in small letter to remove all capital letter mistakes
  
    mutate(
-    scanning = str_extract(remark, "[^;]*brown[^;]*") %>% str_trim()
-  )%>% # /!\ /!\
+    scanning = str_extract(remark, "[^;]*brown[^;]*") |> 
+      str_trim()
+  ) |>  # /!\ /!\
   
   mutate(scanning = case_when(        
     month == "March" & proj_2025 == "Traits" & age_class == "Building" & plant_nr == "1" & leaf_nr == "20" ~  "mostly brown leaves",
@@ -310,7 +311,7 @@ data <- data %>%
     month == "March" & proj_2025 == "Traits" & age_class == "Newly Burnt" & plant_nr == "7" ~ "partly brown leaves",
     month == "March" & proj_2025 == "Traits" & age_class == "Building" & plant_nr == "8" ~ "brown leaves",
     TRUE ~ scanning  # keeps all the other remarks the way they were
-    ))%>%
+    )) |> 
   
   mutate (remark = case_when(
     grepl("water", remark) ~ "liquid water in bag",
@@ -318,7 +319,7 @@ data <- data %>%
     # grepl("only", remark) ~ "3 leaves at scanning; mostly brown leaves; 3 leaves at thickness", # /!\ /!\
      grepl("harvested", remark) ~ "no leaf harvested",
     TRUE ~ remark  # keeps all the other remarks the way they were
-  )) %>%
+  )) |> 
   mutate(remark = case_when(
     grepl("3 leaves at scanning ; 3 leaves at thickness ; 3 leaves at dry mass", remark) ~ "3 leaves at scanning; 3 leaves at thickness; 3 leaves at dry mass",
     grepl("brown leaves ; 3 leaves at wet mass ; 3 leaves at thickness ; 3 leaves at dry mass", remark) ~ "brown leaves; 3 leaves at wet mass; 3 leaves at thickness; 3 leaves at dry mass",
@@ -333,7 +334,7 @@ unique(data$remark)
 ```
 
 ```{r}
-#| label: adjusting bulk_nr values per trait
+#| label: adjusting-bulk_nr-values-per-trait
 
 # While the bulk number from the envelope represents the initial sample size, sometimes leaves are lost or gained during the trait sampling process. Need to check comments and the particple count from the leaf area scans to adjust the bulk number leaves for each trait. This needs to be done before calculating per leaf trait values, which can be used for metrics like SLA and LDMC.
 
@@ -341,7 +342,7 @@ unique(data$remark)
 
 # Order of trait measurements is: fvfm_initial, wet_mass, leaf_area, leaf_thickness, dry_mass
 
-data <- data %>%
+data <- data |> 
   mutate (remark = case_when(
     grepl("APL2797", envelope_ID) ~ "3 leaves at scanning ; 2 leaves at thickness ; 2 leaves at dry mass"
   ))
@@ -351,18 +352,18 @@ unique(data$remark)
 ```
 
 ```{r}
-#| label: adjusting weird values in the data
+#| label: adjusting-weird-values-in-the-data
 
 ## March
-data <- data %>%
+data <- data |> 
   mutate(leaf_thickness_3_mm = case_when(
     grepl("AGT0463", envelope_ID) ~ 0.249,
     TRUE ~ leaf_thickness_3_mm
-  )) %>%  #BUI 8 : 0.588 in data frame ; 0.249 on the envelope AGT0463
+  )) |>   #BUI 8 : 0.588 in data frame ; 0.249 on the envelope AGT0463
   mutate(month = case_when(
     grepl("January", month) ~ "March",
     TRUE ~ month
-  )) %>%  #wrong month for PIO1 - leaf15
+  )) |>  #wrong month for PIO1 - leaf15
   mutate(wet_mass_g = case_when(
     grepl(NA, wet_mass_g) ~ 0.01063,
     TRUE ~ wet_mass_g
@@ -370,20 +371,20 @@ data <- data %>%
 
 
 ## May 
-data <- data %>%
+data <- data |> 
 ## wet mass
   mutate(wet_mass_g = case_when(
     grepl("AUX0977", envelope_ID) ~ 0.01069,
     TRUE ~ wet_mass_g
-  )) %>%  #PIO 7 : 0.10690 in data frame ; 0.1069 on enveloppe AUX097--> pb with 5 decimals scale
+  )) |>   #PIO 7 : 0.10690 in data frame ; 0.1069 on enveloppe AUX097--> pb with 5 decimals scale
   mutate(wet_mass_g = case_when(
     grepl("APP8997", envelope_ID) ~ 0.01449,
     TRUE ~ wet_mass_g
-  )) %>%  #MAT 2 : 0.14490 in data frame ; 0.01449 on the envelope APP8997
+  )) |>   #MAT 2 : 0.14490 in data frame ; 0.01449 on the envelope APP8997
   mutate(dry_mass_g = case_when(
     grepl("AOM6256", envelope_ID) ~ 0.00590,
     TRUE ~ dry_mass_g
-  )) %>%  #MAT 8 : 0.0590 in data frame ; 0.00590 on the enveloppe AOM6256
+  )) |>   #MAT 8 : 0.0590 in data frame ; 0.00590 on the enveloppe AOM6256
 ## wrong month  
   mutate(month = case_when(
     month == "March" & proj_2025 == "TT Hot" & age_class == "Pioneer" & plant_nr == "6" & leaf_age == "old" & temp_exp == 38 & fv_fm_final == 0.12 ~ "May",
@@ -395,7 +396,7 @@ data <- data %>%
 # Calculate per leaf trait values
 
 ```{r}
-#| label: calculate bulk nr for each trait
+#| label: calculate-bulk_nr-for-each-trait
 
 # Before checking for outliers, need to convert traits to 'per leaf' values, else outliers might simply reflect a shift in the leaf numbers for 'absolute' values.
 
@@ -410,18 +411,18 @@ data$bulk_nr_wet_mass <- data$bulk_nr_leaves
 
 
 # Modify based on the wet mass comments
-data <- data %>%
+data <- data |> 
   mutate(bulk_nr_wet_mass = case_when(
     grepl("3 leaves at wet mass", remark) ~ 3,
     .default = bulk_nr_wet_mass    # Keep original bulk nr value if no comment is applied to row
   ))
 
 # Create leaf area, rename the particle counts from scanner. More accurate then comments for values less than 4. However, sometimes leaves break into multiple parts, so the particle count may be higher than the leaf count artificially.
-data <- data %>% 
+data <- data |> 
   rename(bulk_nr_leaf_area = leaf_area_scanned_bulk_nr)
 
 # Modify based on the wet mass comments
-data <- data %>%
+data <- data |> 
   mutate(bulk_nr_leaf_area = case_when(
     # Checked against images, indeed 5 leaves (not broken)
     grepl("5 leaves at scanning", remark) ~ 5,
@@ -435,8 +436,8 @@ table(data$remark, data$bulk_nr_leaf_area)
 
 # Find rows where leaf number for area is higher than leaf number for wet mass
 # Need to go and check 1) leaf scans, 2) envelopes to see if extra particles are in envelope, 3) remarks column, 4) the excel tab on leaf area checks
-bulk_nr_issues <- data %>%
-  filter(bulk_nr_leaf_area > bulk_nr_wet_mass) %>% 
+bulk_nr_issues <- data |> 
+  filter(bulk_nr_leaf_area > bulk_nr_wet_mass) |> 
   select(envelope_ID, remark, bulk_nr_leaves, bulk_nr_wet_mass, bulk_nr_leaf_area)
 
 
@@ -447,7 +448,7 @@ bulk_nr_issues <- data %>%
 
 
 # Modify based on the comments, checking images etc. 
-data <- data %>%
+data <- data |> 
   mutate(bulk_nr_leaf_area = case_when(
     # Envelope ID's are X, then do Y
     grepl("AEI1422", envelope_ID) ~ 5,
@@ -464,13 +465,13 @@ data <- data %>%
 data$bulk_nr_thickness <- data$bulk_nr_leaf_area
 
 # Check how many envelopes have fewer than three thickness measurements
-bulk_nr_issues_thickness <-  data %>%
+bulk_nr_issues_thickness <-  data |> 
   filter(rowSums(across(starts_with("leaf_thickness_"), ~ . > 0)) < 3)
 
 # No issues!
 
 # Modify based on the thickness comments
-data <- data %>%
+data <- data |> 
   mutate(bulk_nr_thickness = case_when(
     grepl("3 leaves at thickness", remark) ~ 3,
     grepl("5 leaves at thickness", remark) ~ 5,
@@ -482,7 +483,7 @@ data <- data %>%
 data$bulk_nr_dry_mass <- data$bulk_nr_thickness
 
 # Modify based on the dry mass comments
-data <- data %>%
+data <- data |> 
   mutate(bulk_nr_dry_mass = case_when(
     grepl("3 leaves at dry mass", remark) ~ 3,
     grepl("5 leaves at dry mass", remark) ~ 5,
@@ -491,14 +492,14 @@ data <- data %>%
 ```
 
 ```{r}
-#| label: calculate per leaf values for each trait
+#| label: calculate-per-leaf-values-for-each-trait
 
-data <- data %>% 
+data <- data |>  
   mutate(
     wet_mass = wet_mass_g / bulk_nr_wet_mass,
     leaf_area = leaf_area_sum / bulk_nr_leaf_area,
     dry_mass = dry_mass_g / bulk_nr_dry_mass
-  ) %>% 
+  ) |> 
   # Round the decimal places
   mutate(
     wet_mass = round(wet_mass, digits = 5),
@@ -510,11 +511,12 @@ data <- data %>%
 # Check trait outliers
 
 ```{r}
-#| label: check plant height (vegetative) outliers
+#| label: check-plant-height-(vegetative)-outliers
+#| warning: false
 
 # making a scatterplot for vegetative plant height per plant
-(data %>% 
-         filter(proj_2025 == "Traits") %>% 
+(data |> 
+         filter(proj_2025 == "Traits") |>  
        ggplot(aes(x = factor(plant_nr), y = height_vegetative, colour = factor(plant_nr))) +
   geom_point(size = 2, alpha = 0.8,
              position = position_jitter(width = 0.15)) +
@@ -528,8 +530,8 @@ data <- data %>%
 
 
 # making a scatterplot for flowering plant height per plant
-(data %>% 
-         filter(proj_2025 == "Traits") %>% 
+(data |> 
+         filter(proj_2025 == "Traits") |>  
        ggplot(aes(x = factor(plant_nr), y = height_flower, colour = factor(plant_nr))) +
   geom_point(size = 2, alpha = 0.8,
              position = position_jitter(width = 0.15)) +
@@ -546,8 +548,9 @@ data <- data %>%
 # Flowering height should probably be taller than vegetative height
 # So above the 1:1 line
 
-ggplot(data %>%  filter(proj_2025 == "Traits"),
-       aes(x = height_vegetative, y = height_flower)) +
+ggplot(data |>   
+      filter(proj_2025 == "Traits"),
+      aes(x = height_vegetative, y = height_flower)) +
   
   # scatter points
   geom_point(aes(colour = factor(plant_nr), shape = factor(age_class)),
@@ -575,11 +578,12 @@ ggplot(data %>%  filter(proj_2025 == "Traits"),
 ```
 
 ```{r}
-#| label: check wet mass outliers (per leaf)
+#| label: check-wet-mass-outliers-(per-leaf)
+#| warning: false
 
 # making a scatterplot for wet mass mean for trait leaves, plant_nr on x-axis and weight in g on y-axis
-(data %>% 
-         filter(proj_2025 == "Traits") %>% 
+(data |>  
+         filter(proj_2025 == "Traits") |> 
        ggplot(aes(x = factor(plant_nr), y = wet_mass, colour = factor(plant_nr))) +
   geom_point(size = 2, alpha = 0.8,
              position = position_jitter(width = 0.15)) +
@@ -604,10 +608,11 @@ ggplot(data %>%  filter(proj_2025 == "Traits"),
 ```
 
 ```{r}
-#| label: check leaf area outliers (per leaf)
+#| label: check-leaf-area-outliers-(per-leaf)
+#| warning: false
 
 # making scatterpolt for leaf area mean for trait leaves, plant_nr on x-axis and mean leaf area on y-axis. by plant nr, age class, month 
-ggplot(data %>%  filter(proj_2025 == "Traits"),
+ggplot(data |>  filter(proj_2025 == "Traits"),
        aes(x = factor(plant_nr), y = leaf_area, colour = factor(plant_nr))) +
   geom_point(size = 2, alpha = 0.8,
              position = position_jitter(width = 0.15)) +
@@ -620,7 +625,7 @@ ggplot(data %>%  filter(proj_2025 == "Traits"),
   )
 
 # Check source file issues
-ggplot(data %>%  filter(proj_2025 == "Traits"),
+ggplot(data |>  filter(proj_2025 == "Traits"),
        aes(x = factor(plant_nr), y = leaf_area, colour = factor(source_file))) +
   geom_point(size = 2, alpha = 0.8,
              position = position_jitter(width = 0.15)) +
@@ -633,7 +638,7 @@ ggplot(data %>%  filter(proj_2025 == "Traits"),
   )
 
 # Check source file issues
-ggplot(data %>%  filter(proj_2025 == "Traits"),
+ggplot(data |>  filter(proj_2025 == "Traits"),
        aes(x = factor(plant_nr), y = leaf_area, colour = factor(source_file))) +
   geom_point(size = 2, alpha = 0.8,
              position = position_jitter(width = 0.15)) +
@@ -652,11 +657,12 @@ ggplot(data %>%  filter(proj_2025 == "Traits"),
 ```
 
 ```{r}
-#| label: check leaf thickness outliers (per measurement 1-3 replicates)
+#| label: check-leaf-thickness-outliers-(per-measurement-1-3-replicates)
+#| warning: false
 # histogram for leaf thickness distribution for trait leaves, not mean, rather seperate reps
 
-data_long_thickness <- data %>% 
-  filter(proj_2025 == "Traits") %>% 
+data_long_thickness <- data |> 
+  filter(proj_2025 == "Traits") |> 
   pivot_longer( # to get the seperate columns reshaped
     cols = c(leaf_thickness_1_mm, leaf_thickness_2_mm, leaf_thickness_3_mm),
     names_to = "replicate",
@@ -698,7 +704,8 @@ ggplot(data_long_thickness, #plotting drom long format
 ```
 
 ```{r}
-#| label: check dry mass outliers (per leaf)
+#| label: check-dry-mass-outliers-(per-leaf)
+#| warning: false
 
 # making a scatterplot for dry mass mean for trait leaves, plant_nr on x-axis and weight in g on y-axis
 ggplot(data |> filter(proj_2025 == "Traits"),
@@ -721,10 +728,10 @@ ggplot(data |> filter(proj_2025 == "Traits"),
 ```
 
 ```{r}
-#| label: wet mass vs dry mass
+#| label: wet-mass-vs-dry-mass
+#| warning: false
 
-
-ggplot(data %>%  filter(proj_2025 == "Traits"),
+ggplot(data |>  filter(proj_2025 == "Traits"),
        aes(x = wet_mass_g, y = dry_mass_g)) +
   
   # scatter points
@@ -754,7 +761,7 @@ ggplot(data %>%  filter(proj_2025 == "Traits"),
 # relationship between dry and wet mass seem to be linear
 # 2 low values for dry mass plant 6 for BUI and MAT (according to the graph just above) --> explain by the fact that the dry mass is already lower than other and we divide it by five since there is five which make it even lower --> high chance the leaves aren't all from this individual --> we may remove this individual later on
 
-ggplot(data %>%  filter(proj_2025 == "Traits"),
+ggplot(data |>  filter(proj_2025 == "Traits"),
        aes(x = wet_mass_g, y = dry_mass_g)) +
   
   # scatter points
@@ -807,9 +814,9 @@ High LDMC (0.5 - 0.7) : Leaves are dense, high in lignin/cellulose, and low in w
 Low LDMC (0;05 - 0.5) : Leaves are "succulent" or watery.
 
 ```{r}
-#| label: calculate SLA and LDMC
+#| label: calculate-SLA-and-LDMC
 
-data <- data %>%  
+data <- data |>  
   mutate(
     SLA = ifelse(
       !is.na(leaf_area) & !is.na(dry_mass), # excluding rows with NAs
@@ -818,7 +825,7 @@ data <- data %>%
     )
   )
 
-data <- data %>% 
+data <- data |> 
   mutate(
     LDMC = ifelse( # making new ldmc column
       !is.na(dry_mass) & !is.na(wet_mass), # excluding rows with NAs
@@ -829,10 +836,11 @@ data <- data %>%
 ```
 
 ```{r}
-#| label: check SLA outliers (per leaf)
+#| label: check-SLA-outliers-(per-leaf)
+#| warning: false
 
 # making a scatterplot for dry mass mean for trait leaves, plant_nr on x-axis and weight in g on y-axis
-ggplot(data %>%  filter(proj_2025 == "Traits"),
+ggplot(data |>  filter(proj_2025 == "Traits"),
        aes(x = factor(plant_nr), y = SLA, colour = factor(plant_nr))) +
   geom_point(size = 2, alpha = 0.8,
              position = position_jitter(width = 0.15)) +
@@ -852,10 +860,11 @@ ggplot(data %>%  filter(proj_2025 == "Traits"),
 ```
 
 ```{r}
-#| label: check LDMC outliers (per leaf)
+#| label: check-LDMC-outliers-(per-leaf)
+#| warning: false
 
 # making a scatterplot for dry mass mean for trait leaves, plant_nr on x-axis and weight in g on y-axis
-ggplot(data %>%  filter(proj_2025 == "Traits"),
+ggplot(data |>  filter(proj_2025 == "Traits"),
        aes(x = factor(plant_nr), y = LDMC, colour = factor(plant_nr))) +
   geom_point(size = 2, alpha = 0.8,
              position = position_jitter(width = 0.15)) +
@@ -879,11 +888,12 @@ ggplot(data %>%  filter(proj_2025 == "Traits"),
 # Check fluorescence outliers
 
 ```{r}
-#| label: check fluorescence outliers
+#| label: check-fluorescence-outliers
+#| warning: false
 
 # making a scatterplot for initial fluorescence
-(data %>% 
-         filter(proj_2025 == "Traits") %>% 
+(data |> 
+         filter(proj_2025 == "Traits") |> 
        ggplot(aes(x = factor(plant_nr), y = fv_fm_initial, colour = factor(plant_nr))) +
   geom_point(size = 2, alpha = 0.8,
              position = position_jitter(width = 0.15)) +
@@ -895,8 +905,8 @@ ggplot(data %>%  filter(proj_2025 == "Traits"),
     title = "Initial fluorescence by plant, age class and month"
   ))
 
-(data %>% 
-         filter(proj_2025 == "TT Hot") %>% 
+(data |> 
+         filter(proj_2025 == "TT Hot") |> 
        ggplot(aes(x = factor(plant_nr), y = fv_fm_final, colour = factor(plant_nr))) +
   geom_point(size = 2, alpha = 0.8,
              position = position_jitter(width = 0.15)) +
@@ -908,8 +918,8 @@ ggplot(data %>%  filter(proj_2025 == "Traits"),
     title = "Final fluorescence TT Hot by plant, age class and month"
   ))
 
-(data %>% 
-         filter(proj_2025 == "TT Cold") %>% 
+(data |> 
+         filter(proj_2025 == "TT Cold") |> 
        ggplot(aes(x = factor(plant_nr), y = fv_fm_final, colour = factor(plant_nr))) +
   geom_point(size = 2, alpha = 0.8,
              position = position_jitter(width = 0.15)) +
@@ -937,11 +947,11 @@ ggplot(data %>%  filter(proj_2025 == "Traits"),
 ```
 
 ```{r}
-#| label: check fluorescence outliers TT Hot
+#| label: check-fluorescence-outliers-TTHot
+#| warning: false
 
-
-data %>% 
-  filter(proj_2025 == "TT Hot") %>% 
+data |> 
+  filter(proj_2025 == "TT Hot") |> 
   
   ggplot(aes(x = as.numeric(as.character(temp_exp)), 
              y = fv_fm_final,
@@ -962,11 +972,12 @@ data %>%
 ```
 
 ```{r}
-#| label: check fluorescence outliers TT Cold
+#| label: check-fluorescence-outliers-TTCold
+#| warning: false
 
-data %>% 
-  filter(proj_2025 == "TT Cold") %>% 
-  mutate(temp_exp = factor(temp_exp, levels = c("5", "0", "-5", "-10","-15", "-20"))) %>%
+data |> 
+  filter(proj_2025 == "TT Cold") |> 
+  mutate(temp_exp = factor(temp_exp, levels = c("5", "0", "-5", "-10","-15", "-20"))) |>
   ggplot(aes(x = temp_exp, 
              y = fv_fm_final,
              group = plant_nr,      
@@ -1084,7 +1095,7 @@ TTHot_plant <- psiiht(temperature = as.numeric(as.character(united_columns_htol_
                fvfm = as.numeric(as.character(united_columns_htol_plant$fv_fm_final)),
                control_temp = 20,
                id = united_columns_htol_plant$new_id,
-               boots = 5)# put 1000
+               boots = 1000)# put 1000
 
 TTHot_plant_sum <- summary(TTHot_plant) # see summary output for T50 values (note, just means)
 
@@ -1147,7 +1158,7 @@ TTHot_plant_out <- Map(
 TTHot_thermal_plant <- do.call(rbind, TTHot_plant_out)
 
 # String split back to columns the ID
-TTHot_wide_plant <- TTHot_thermal_plant %>%
+TTHot_wide_plant <- TTHot_thermal_plant |>
   separate_wider_delim(
     cols = id, # the column to split
     delim = "_", # how is the column seperated
@@ -1155,7 +1166,7 @@ TTHot_wide_plant <- TTHot_thermal_plant %>%
     names = c("site_name", "species", "age_class", "plant_nr", "month", "leaf_age", "proj_2025") #,
    # too_many = "merge", # Merges any extra parts into the last column
    # too_few = "align_start" # Fills missing values with NA
-  ) %>% 
+  ) |> 
   # Check the data type of the new output columns and convert if necessary
    mutate(
     age_class = factor(age_class),
@@ -1165,14 +1176,14 @@ TTHot_wide_plant <- TTHot_thermal_plant %>%
     leaf_age = factor(leaf_age),
     species = factor(species),
     plant_nr = factor(plant_nr)
-  ) %>% 
+  ) |> 
   # Relevel factors in natural order
   mutate(
     age_class = factor(age_class, levels = c("Newly Burnt","Pioneer", "Building", "Mature")))
 
 # Create a preliminary plot focusing on T50 metric
-TTHot_wide_plant %>% 
-  filter(metric == "T50") %>% 
+TTHot_wide_plant |> 
+  filter(metric == "T50") |> 
 ggplot(aes(x = age_class,
            y = estimate,
            color = plant_nr)) +
@@ -1349,7 +1360,7 @@ TTCold_plant_out <- Map(
 TTCold_thermal_plant <- do.call(rbind, TTCold_plant_out)
 
 # Convert back to real cold temperature (°C), we multiply by -1 to reverse the model's trick and get true negative values.
-TTCold_thermal_plant <- TTCold_thermal_plant %>%
+TTCold_thermal_plant <- TTCold_thermal_plant |>
   mutate(
     estimate = estimate * -1,
     lower    = lower * -1,
@@ -1358,7 +1369,7 @@ TTCold_thermal_plant <- TTCold_thermal_plant %>%
   )
 
 # String split back to columns the ID
-TTCold_wide_plant <- TTCold_thermal_plant %>%
+TTCold_wide_plant <- TTCold_thermal_plant |>
   separate_wider_delim(
     cols = id, # the column to split
     delim = "_", # how is the column seperated
@@ -1366,7 +1377,7 @@ TTCold_wide_plant <- TTCold_thermal_plant %>%
     names = c("site_name", "species", "age_class", "plant_nr", "month", "leaf_age", "proj_2025") #,
    # too_many = "merge", # Merges any extra parts into the last column
    # too_few = "align_start" # Fills missing values with NA
-  ) %>% 
+  ) |> 
   # Check the data type of the new output columns and convert if necessary
    mutate(
     age_class = factor(age_class),
@@ -1376,14 +1387,14 @@ TTCold_wide_plant <- TTCold_thermal_plant %>%
     leaf_age = factor(leaf_age),
     species = factor(species),
     plant_nr = factor(plant_nr)
-  ) %>% 
+  ) |> 
   # Relevel factors in natural order
   mutate(
     age_class = factor(age_class, levels = c("Newly Burnt","Pioneer", "Building", "Mature")))
 
 # Create a preliminary plot focusing on T50 metric
-TTCold_wide_plant %>% 
-  filter(metric == "T50") %>% 
+TTCold_wide_plant |> 
+  filter(metric == "T50") |> 
 ggplot(aes(x = age_class,
            y = estimate,
            color = plant_nr)) +
