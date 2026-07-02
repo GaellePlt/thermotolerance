@@ -20,9 +20,8 @@ library(lubridate) # Date and time formatting
 library(readr) # Data importation functions
 library(stringr) # String and character text
 library(future) # Using severals cores at the same time
-library(lme4) # Lineare Mixed Model with Nested effects
-library(car) # GLM model
 library(ggcorrplot)
+library(emmeans)
 ```
 
 November and January data (collected by Bente)
@@ -31,91 +30,91 @@ November and January data (collected by Bente)
 #| label: importing-raw-data-of-trait-and-fluorescence
 #| message: false 
 
-raw_data_nov_jan <- read_excel(
-  "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/Analyse statistique/thermotolerance/data/raw_data/Seasonal Calluna Thermal Tolerance and Plant Functional Traits.xlsx", 
-  sheet = "cv_nov25_jan26", # Choose the sheet from excel
-  na = c("", "NA")) # NAs are actually imported as NAs, not as characters 
+# raw_data_nov_jan <- read_excel(
+#   "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/Analyse statistique/thermotolerance/data/raw_data/Seasonal Calluna Thermal Tolerance and Plant Functional Traits.xlsx", 
+#   sheet = "cv_nov25_jan26", # Choose the sheet from excel
+#   na = c("", "NA")) # NAs are actually imported as NAs, not as characters 
 ```
 
 ```{r}
 #| label: clean-trait-dataset-to-match-DURIN-formatting
 
-
-# Change some column names to snake_case standard
-# Change any column names to match DURIN standards - some outlined here (https://github.com/Durin-project/Durin_data)
-# Some information will be specific to traits, fluorescence etc.
-# using slice() to remove the first three row of example data (ALWAYS CHECK!)
-
-raw_data_nov_jan <- raw_data_nov_jan |> 
-  # New name then old name of column, including snake case ('_' and lower letters)
-  rename(site_name = siteID,
-         age_class = ageClass,
-         collection_time = CollTime,
-         paired_with = PairedWith,
-         temp_exp = TempExp,
-         temp_exp_time = TempExpTime,
-         temp_exp_time_unit = TempExpTimeUnit,
-         fv_fm_initial = 'Fv/Fm_Initial',
-         fv_fm_hr = 'Fv/Fm_Hr',
-         fv_fm_final = 'Fv/Fm_Final',
-         height_flower = 'height(s)_flower',
-         height_vegetative = 'height(s)_top',
-         treatment_date = TreatmentDate,
-         treatment_time = TreatmentTime) |>  
-  slice(-(1)) # Remove first three rows (excluding headers)
-
-
-# Check variable types (character, numeric etc)
-glimpse(raw_data_nov_jan)
-
-# Changing classes of all variables that should be in class factor
-raw_data_nov_jan <- raw_data_nov_jan |>  
-  mutate(across(c(site_name, species, proj_2025, project, age_class, plant_nr, leaf_age, sample, paired_with, calluna_shoot_type, temp_exp, temp_exp_time, temp_exp_time_unit, fv_fm_hr, scanned), as.factor))
-
-
-# Changing classes of variables that should be in class dbl/numeric
-raw_data_nov_jan <- raw_data_nov_jan|>
-    mutate(across(c(fv_fm_initial, fv_fm_final, wet_mass_g, leaf_thickness_1_mm, leaf_thickness_2_mm, leaf_thickness_3_mm, dry_mass_g, height_flower, height_vegetative), as.numeric))
-
-# Changing classes of all variables that should be in class integers
-raw_data_nov_jan <- raw_data_nov_jan |>
-    mutate(across(c(bulk_nr_leaves, leaf_nr), as.integer))
-
-# Recheck data types again
-glimpse(raw_data_nov_jan) 
-
-
-# Order relevant variables (useful for plotting and order based analyses)
-# age_class sorted from youngest to oldest
-
-raw_data_nov_jan$age_class <- factor((raw_data_nov_jan$age_class),
-                         levels = c("Newly Burnt", "Pioneer", 
-                                    "Building", "Mature"))
-# Check if changed successfully
-levels(raw_data_nov_jan$age_class)
-
-
-# Converting day, month, year column into one column on the format yyyy_mm_dd
-# Convert collection time into proeper time format
-# removing the day and year columns, keep month for data cleaning checking for now
-
-raw_data_nov_jan <- raw_data_nov_jan|> 
-  mutate(date  = ymd_hm(paste(year, month, day,
-                 format(collection_time, format = "%H:%M"))), .after = 1)  |> 
-  select(-c(day, year, collection_time)) 
-
-
-glimpse(raw_data_nov_jan) 
-
-# To help with plotting, make month an ordered factor (more useful one more months)
-raw_data_nov_jan <- raw_data_nov_jan |> 
-  mutate(month = factor(month, levels = c("November", "January")))
-
-# Create a unique plant_ID given age_class, month, and plant_nr
-raw_data_nov_jan <- raw_data_nov_jan |>   # assuming you already created Month/date_day earlier
-  mutate(
-    unique_plantID = paste(age_class, month, plant_nr, sep = "_")
-  )
+# 
+# # Change some column names to snake_case standard
+# # Change any column names to match DURIN standards - some outlined here (https://github.com/Durin-project/Durin_data)
+# # Some information will be specific to traits, fluorescence etc.
+# # using slice() to remove the first three row of example data (ALWAYS CHECK!)
+# 
+# raw_data_nov_jan <- raw_data_nov_jan |> 
+#   # New name then old name of column, including snake case ('_' and lower letters)
+#   rename(site_name = siteID,
+#          age_class = ageClass,
+#          collection_time = CollTime,
+#          paired_with = PairedWith,
+#          temp_exp = TempExp,
+#          temp_exp_time = TempExpTime,
+#          temp_exp_time_unit = TempExpTimeUnit,
+#          fv_fm_initial = 'Fv/Fm_Initial',
+#          fv_fm_hr = 'Fv/Fm_Hr',
+#          fv_fm_final = 'Fv/Fm_Final',
+#          height_flower = 'height(s)_flower',
+#          height_vegetative = 'height(s)_top',
+#          treatment_date = TreatmentDate,
+#          treatment_time = TreatmentTime) |>  
+#   slice(-(1)) # Remove first three rows (excluding headers)
+# 
+# 
+# # Check variable types (character, numeric etc)
+# glimpse(raw_data_nov_jan)
+# 
+# # Changing classes of all variables that should be in class factor
+# raw_data_nov_jan <- raw_data_nov_jan |>  
+#   mutate(across(c(site_name, species, proj_2025, project, age_class, plant_nr, leaf_age, sample, paired_with, calluna_shoot_type, temp_exp, temp_exp_time, temp_exp_time_unit, fv_fm_hr, scanned), as.factor))
+# 
+# 
+# # Changing classes of variables that should be in class dbl/numeric
+# raw_data_nov_jan <- raw_data_nov_jan|>
+#     mutate(across(c(fv_fm_initial, fv_fm_final, wet_mass_g, leaf_thickness_1_mm, leaf_thickness_2_mm, leaf_thickness_3_mm, dry_mass_g, height_flower, height_vegetative), as.numeric))
+# 
+# # Changing classes of all variables that should be in class integers
+# raw_data_nov_jan <- raw_data_nov_jan |>
+#     mutate(across(c(bulk_nr_leaves, leaf_nr), as.integer))
+# 
+# # Recheck data types again
+# glimpse(raw_data_nov_jan) 
+# 
+# 
+# # Order relevant variables (useful for plotting and order based analyses)
+# # age_class sorted from youngest to oldest
+# 
+# raw_data_nov_jan$age_class <- factor((raw_data_nov_jan$age_class),
+#                          levels = c("Newly Burnt", "Pioneer", 
+#                                     "Building", "Mature"))
+# # Check if changed successfully
+# levels(raw_data_nov_jan$age_class)
+# 
+# 
+# # Converting day, month, year column into one column on the format yyyy_mm_dd
+# # Convert collection time into proeper time format
+# # removing the day and year columns, keep month for data cleaning checking for now
+# 
+# raw_data_nov_jan <- raw_data_nov_jan|> 
+#   mutate(date  = ymd_hm(paste(year, month, day,
+#                  format(collection_time, format = "%H:%M"))), .after = 1)  |> 
+#   select(-c(day, year, collection_time)) 
+# 
+# 
+# glimpse(raw_data_nov_jan) 
+# 
+# # To help with plotting, make month an ordered factor (more useful one more months)
+# raw_data_nov_jan <- raw_data_nov_jan |> 
+#   mutate(month = factor(month, levels = c("November", "January")))
+# 
+# # Create a unique plant_ID given age_class, month, and plant_nr
+# raw_data_nov_jan <- raw_data_nov_jan |>   # assuming you already created Month/date_day earlier
+#   mutate(
+#     unique_plantID = paste(age_class, month, plant_nr, sep = "_")
+#   )
 ```
 
 March data
@@ -306,10 +305,10 @@ Entire dataset (March and May)
 ```{r}
 #| label: Merge-March-date-frame-and-May-data-frame
 
-raw_data <- bind_rows(raw_data_nov_jan, raw_data_mar, raw_data_may)
+raw_data <- bind_rows(raw_data_mar, raw_data_may)
 ```
 
-Leaf area dataset for March and May (not nov et jan yet)
+Leaf area dataset for March and May
 
 ```{r}
 #| label: import-leaf-area-dataset-tidy-and-match-to-trait-dataset
@@ -1226,19 +1225,19 @@ filtered_results_TTHot_plant <- TTHot_plant$results[list_ids]
 
 summarise_htol_plant <- function(res, id) {
 
-  # # si c'est null on met des NA pour que ça ne bloque pas
-  # if (is.null(res)) {
-  #   return(data.frame(
-  #     id = id,
-  #     metric = c("T50", "T95", "Tcrit"),
-  #     estimate = NA,
-  #     se = NA,
-  #     lower = NA,
-  #     upper = NA
-  #   ))
-  # }
-  # 
-  # # sinon on calucule normalement
+  # si c'est null on met des NA pour que ça ne bloque pas
+  if (is.null(res)) {
+    return(data.frame(
+      id = id,
+      metric = c("T50", "T95", "Tcrit"),
+      estimate = NA,
+      se = NA,
+      lower = NA,
+      upper = NA
+    ))
+  }
+
+  # sinon on calucule normalement
   data.frame(
     id = id,
     metric = c("T50", "T95", "Tcrit"),
@@ -1257,19 +1256,19 @@ summarise_htol_plant <- function(res, id) {
   )
 }
 
-# # Run the summarize function for each ID output
-# TTHot_plant_out <- Map(
-#   summarise_htol_plant, # function
-#   TTHot_plant$results, # extract the results part of the psiiht output
-#   names(TTHot_plant$results)  # extract the ID from the psiiht output
-#   )
-
 # Run the summarize function for each ID output
 TTHot_plant_out <- Map(
   summarise_htol_plant, # function
-  filtered_results_TTHot_plant, # extract the results part of the psiiht output
-  names(filtered_results_TTHot_plant) # extract the ID from the psiiht output
-)
+  TTHot_plant$results, # extract the results part of the psiiht output
+  names(TTHot_plant$results)  # extract the ID from the psiiht output
+  )
+
+# # Run the summarize function for each ID output
+# TTHot_plant_out <- Map(
+#   summarise_htol_plant, # function
+#   filtered_results_TTHot_plant, # extract the results part of the psiiht output
+#   names(filtered_results_TTHot_plant) # extract the ID from the psiiht output
+# )
 
 # Create the dataframe by rowbinding
 TTHot_thermal_plant <- do.call(rbind, TTHot_plant_out)
@@ -1551,7 +1550,6 @@ ggplot(aes(x = age_class,
 #| label: Create-data-frame-Nov-Jan-March-May-NB-PIO-old
 
 TTHot_wide_NB_PIO_old <- TTHot_wide_plant |>
-  mutate(leaf_age = if_else(month %in% c("November", "January"), "old", as.character(leaf_age))) |> #car c'est le même feuilles: année 2025 
   filter(age_class %in% c("Newly Burnt", "Pioneer")) |>
   filter(leaf_age %in% c("old")) |>
   filter(metric %in% c("T50"))
@@ -1581,157 +1579,176 @@ print(Anova(modele_lm_1, type = "II")) #, white.adjust = "hc3" # mois très sign
 ```{r}
 #| label: Post-hoc-test-month
 library(emmeans)
+library(multcomp)
 
 comp_mois <- emmeans(modele_lm_1, specs = pairwise ~ month)
 summary(comp_mois$contrasts)
 
-lettres_posthoc <- data.frame(
-  month = c("November 2025", "January 2026", "March 2026", "May 2026"),
-  lettre = c("b", "a", "bc", "c"),
-  y_position = c(55.0, 58.0, 55.0, 52.0) 
-)
-```
+valeurs_mois <- emmeans(modele_lm_1, ~ month)
 
-```{r}
-#| label: interraction-plot
-#| warning: false
-
-with(TTHot_wide_NB_PIO_old, interaction.plot(
-  x.factor = month,
-  trace.factor = droplevels(age_class),
-  response = estimate,
-  fun = function(x) mean(x, na.rm = TRUE),
-  ylab = "T50 (°C)",
-  xlab = "Month",
-  trace.label = "Age class",
-  col = c("firebrick", "dodgerblue3"),
-  lwd = 2
-))
+cld(valeurs_mois, Letters = letters)
 ```
 
 ```{r}
 #| label: box-plot-month
 #| warning: false
-ggplot(TTHot_wide_NB_PIO_old, aes(
-  x = factor(month, 
-             levels = c("November", "January", "March", "May"),
-             labels = c("November 2025", "January 2026", "March 2026", "May 2026")),
-  y = estimate, 
-  fill = factor(month, levels = c("November", "January", "March", "May"))
-)) +
-  geom_violin(alpha = 0.2, trim = FALSE) +
-  geom_boxplot(width = 0.1, alpha = 1, outlier.shape = NA, color = "grey30") + 
-  geom_jitter(width = 0.1, size = 1.5, alpha = 0.7, color = "black") + 
-  annotate("text", x = 1, y = 58, label = "b", color = "grey30", size = 4, fontface = "bold") +  # November
-  annotate("text", x = 2, y = 58, label = "a", color = "grey30", size = 4, fontface = "bold") +  # January
-  annotate("text", x = 3, y = 58, label = "bc", color = "grey30", size = 4, fontface = "bold") + # March
-  annotate("text", x = 4, y = 58, label = "c", color = "grey30", size = 4, fontface = "bold") +  # May
-  theme_minimal() +
-  labs(
-    title = "Distribution of T50 by Month",
-    x = "Month",
-    y = "T50 (°C)"
-  ) +
-  stat_summary(
-  aes(group = month),
-  fun.data = function(y) {
-    data.frame(y = 45, label = paste0("n = ", length(y)))
-  },
-  geom = "text",
-  color = "grey40",
-  size = 3.2,
-  vjust = 0
-  ) +
-  theme(legend.position = "none")
+library(patchwork)
 
-# ggsave(
-#   filename = "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/Figures/Distribution of T50 by Month.png",
-#   width = 18, height = 12, units = "cm", dpi = 300
-# )
-```
-
-```{r}
-#| label: box-plot-age_class
-#| warning: false
-ggplot(TTHot_wide_NB_PIO_old, aes(x = age_class, y = estimate, fill = age_class)) +
-  geom_violin(alpha = 0.2, trim = FALSE) +
-  geom_boxplot(width = 0.1, alpha = 1, outlier.shape = NA, color = "grey30") + 
-  geom_jitter(width = 0.1, size = 1.5, alpha = 0.7, color = "black") + 
-  theme_minimal() +
-  labs(
-    title = "Distribution of T50 by age_class",
-    x = "age_class",
-    y = "T50 (°C)"
-  ) +
-  stat_summary(
-  aes(group = age_class),
-  fun.data = function(y) {
-    data.frame(y = 45, label = paste0("n = ", length(y)))
-  },
-  geom = "text",
-  color = "grey40",
-  size = 3.2,
-  vjust = 0
-  ) +
-  theme(legend.position = "none")
-```
-
-ggsave(
-
-filename = "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/Figures/Thermal Tolerance (T50) Evolution by Month and Age Class.png",
-
-width = 18, height = 12, units = "cm", dpi = 300
-
+posthoc_letters <- data.frame(
+  month = c("May", "March"),
+  letter = c("a", "b"),
+  y_pos = c(51.5, 53) 
 )
 
-```{r}
-#| label: box-plot-age_class-month
-
-ggplot(TTHot_wide_NB_PIO_old, aes(
-  x = factor(month, 
-             levels = c("November", "January", "March", "May"),
-             labels = c("November 2025", "January 2026", "March 2026", "May 2026")), 
-  y = estimate, 
-  fill = age_class
+g1 <- ggplot(TTHot_wide_NB_PIO_old, aes(
+  x = month,
+  y = estimate
 )) +
-  geom_violin(alpha = 0.3, position = position_dodge(0.8), trim = FALSE) +
-  stat_boxplot(geom = "errorbar", width = 0.07, color = "grey30",
-               position = position_dodge(0.8)) +
-  geom_boxplot(width = 0.15, alpha = 1, outlier.shape = NA, color = "grey30",
-               position = position_dodge(0.8)) + 
-  geom_jitter(aes(group = age_class), size = 1.2, alpha = 0.6, color = "black", 
-              position = position_jitterdodge(jitter.width = 0.1, dodge.width = 0.8)) + 
-  scale_fill_manual(values = c("Newly Burnt" = "#C77CFF", "Pioneer" = "#7CAE00")) +
-  theme_minimal() +
-  labs(
-    title = "T50 by month and age class",
-    x = "Month", 
-    y = "T50 (°C)",
-    fill = "Age class"
+  stat_boxplot(geom = "errorbar", width = 0.07, color = "grey30") +
+  geom_boxplot(width = 0.15, alpha = 1, outlier.shape = NA, color = "grey30", fill = "grey95") + 
+  
+  geom_jitter(
+    aes(color = age_class, shape = age_class),
+    width = 0.1, size = 1.5, alpha = 0.8
+  ) + 
+  
+  geom_text(
+    data = posthoc_letters,
+    aes(x = month, y = y_pos, label = letter),
+    inherit.aes = FALSE, size = 5, color = "black"
+  ) +
+  labs(x = "Month", y = "T50 (°C)") + 
+  scale_color_manual(values = c("Newly Burnt" = "#c07df0", "Pioneer" = "#7cb815")) +
+  stat_summary(
+    aes(group = month),
+    fun.data = function(y) { data.frame(y = 39, label = paste0("n = ", length(y))) },
+    geom = "text", color = "grey60", size = 3.2, vjust = 0
+  ) +
+  theme_light() + 
+  theme(
+    legend.position = "none", 
+    panel.grid.minor = element_blank()
+  )
+
+
+g2 <- ggplot(TTHot_wide_NB_PIO_old, aes(
+  x = month,
+  y = estimate,
+  group = age_class
+)) +
+  geom_jitter(
+    aes(color = age_class, shape = age_class),
+    size = 2, alpha = 1, position = position_jitter(width = 0.1, height = 0, seed = 42)
   ) +
   stat_summary(
-    aes(group = interaction(month, age_class)),
-    fun.data = function(y) {
-      data.frame(y = 45, label = paste0("n=", length(y)))
-    },
-    geom = "text",
-    color = "grey40",
-    size = 2.8,
-    position = position_dodge(0.8),
-    vjust = 0
+    aes(linetype = age_class), 
+    fun = mean, geom = "line", color = "black", linewidth = 0.6            
   ) +
-  theme(legend.position = "right") +
-  geom_text(
-    data = lettres_posthoc,
-    aes(x = month, y = y_position, label = lettre),
-    inherit.aes = FALSE, 
-    color = "grey30",
-    # fontface = "bold",
-    size = 4
+  labs(
+    x = "Month", 
+    y = "T50 (°C)", 
+    color = "Age Class", 
+    shape = "Age Class", 
+    linetype = "Age Class"
+  ) +
+  stat_summary(
+    aes(group = month),
+    fun.data = function(y) { data.frame(y = 39, label = paste0("n = ", length(y))) },
+    geom = "text", color = "grey60", size = 3.2, vjust = 0
+  ) +
+  scale_color_manual(values = c("Newly Burnt" = "#c07df0", "Pioneer" = "#7cb815")) +
+  guides(
+    color = guide_legend(override.aes = list(size = 3, alpha = 1)),
+    shape = guide_legend(override.aes = list(size = 3)),
+    linetype = guide_legend()
+  ) +
+  theme_light() +
+  theme(
+    legend.position = "right", 
+    panel.grid.minor = element_blank()
+  )
+
+# 4. Assembly and Display
+figure_finale <- g1 + g2 + plot_annotation(tag_levels = 'A')+
+  plot_layout(axes = "collect")
+figure_finale
+
+
+ggsave(
+  filename = "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/Figures/Thermal Tolerance (T50) Evolution by month.png",
+  plot = figure_finale,
+  width = 18, height = 12, units = "cm", dpi = 300
+)
+```
+
+```{r}
+#| label: figure
+#| warning: false
+
+
+library(emmeans)
+
+mod_means <- emmeans(modele_lm_1, specs = ~ month * age_class)
+df_means  <- as.data.frame(mod_means)
+
+set.seed(42)
+
+ggplot(TTHot_wide_NB_PIO_old, aes(x = month, y = estimate, group = age_class)) +
+  
+  geom_jitter(
+    aes(color = age_class, shape = age_class),
+    width = 0.15, height = 0, size = 1.8, alpha = 0.5
+  ) +
+  
+  geom_line(
+    data = df_means,
+    aes(y = emmean, linetype = age_class, color = age_class),
+    linewidth = 0.8,
+    position = position_dodge(width = 0.15)
+  ) +
+
+  geom_errorbar(
+    data = df_means,
+    aes(y = emmean, ymin = lower.CL, ymax = upper.CL, color = age_class), 
+    width = 0.08,             
+    linewidth = 0.4, 
+    position = position_dodge(width = 0.15) 
+  ) +
+
+  geom_point(
+    data = df_means,
+    aes(y = emmean, color = age_class, shape = age_class), 
+    size = 3,
+    position = position_dodge(width = 0.15)
+  ) +
+
+  ylim(39, 53) + 
+  labs(
+    x = "Month",
+    y = "T50 (°C)",
+    color = "Age Class",
+    shape = "Age Class",
+    linetype = "Age Class"
+  ) +
+  
+  scale_color_manual(values = c("Newly Burnt" = "#c07df0", "Pioneer" = "#7cb815")) +
+
+  guides(
+    color = guide_legend(override.aes = list(size = 3, alpha = 1)),
+    shape = guide_legend(override.aes = list(size = 3)),
+    linetype = guide_legend()
+  ) +
+  
+  theme_light() +
+  theme(
+    legend.position = "right",
+    panel.grid.minor = element_blank(),
+    legend.title = element_text(face = "bold"),
+    axis.title = element_text(size = 11)
   )
 
 # ggsave(
-#   filename = "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/Figures/Thermal Tolerance (T50) Evolution by Month and Age Class.png",
+#   filename = "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/Figures/Figure Ivan.png",
 #   width = 18, height = 12, units = "cm", dpi = 300
 # )
 ```
@@ -1739,6 +1756,143 @@ ggplot(TTHot_wide_NB_PIO_old, aes(
 ## Cold T50
 
 not possible yet with the data of March and May
+
+## Effect of leaf age on T50
+
+```{r}
+#| label: Create-data-May-old-young
+
+TTHot_wide_old_young <- TTHot_wide_plant |>
+  filter(month %in% c("May")) |>
+  filter(metric %in% c("T50"))
+
+```
+
+```{r}
+#| label: LM-May-old-young
+#| fig-height: 10
+
+modele_lm_2 <- lm(estimate ~ leaf_age * age_class, data = TTHot_wide_old_young)
+performance::check_model(modele_lm_2)
+
+print(Anova(modele_lm_2, type = "II"))
+
+```
+
+```{r}
+#| label: create-data-frame
+#| warning: false
+
+TTHot_wide_all <- bind_rows(TTHot_wide_old_young, TTHot_wide_NB_PIO_old)
+```
+
+```{r}
+#| label: figure-seasonal-effect
+#| warning: false
+library(dplyr)
+library(ggplot2)
+
+# Extract means from Model 1 (OLD leaves for March and May)
+df_old_means <- emmeans(modele_lm_1, specs = ~ month * age_class) |>
+  as.data.frame() |>
+  filter(age_class %in% c("Newly Burnt", "Pioneer")) |>
+  mutate(
+    leaf_age = "old",
+    x_base = ifelse(month == "March", 1, 2),
+    x_offset = ifelse(age_class == "Newly Burnt", -0.10, 0.10),
+    leaf_dodge = ifelse(month == "May", -0.03, 0),
+    x_final = x_base + x_offset + leaf_dodge
+  )
+
+# Extract means from Model 2 (YOUNG leaves for May only)
+df_young_means <- emmeans(modele_lm_2, specs = ~ leaf_age * age_class) |>
+  as.data.frame() |>
+  filter(leaf_age == "young" & age_class %in% c("Newly Burnt", "Pioneer")) |>
+  mutate(
+    month = "May",
+    x_base = 2, 
+    x_offset = ifelse(age_class == "Newly Burnt", -0.10, 0.10),
+    leaf_dodge = 0.03,
+    x_final = x_base + x_offset + leaf_dodge
+  )
+
+# Combine both mean datasets and force-calculate confidence intervals via SE
+df_all_means <- bind_rows(df_old_means, df_young_means) |>
+  mutate(
+    lower.CL = emmean - (1.96 * SE),
+    upper.CL = emmean + (1.96 * SE)
+  )
+
+# Filter and manually align raw background data points (Removes NA and unwanted groups)
+set.seed(42)
+df_filtered_raw <- TTHot_wide_all |> 
+  filter(age_class %in% c("Newly Burnt", "Pioneer")) |>
+  filter(!is.na(leaf_age)) |>  # Cleans up any NA shapes from the legend
+  mutate(
+    x_base = ifelse(month == "March", 1, 2),
+    x_offset = ifelse(age_class == "Newly Burnt", -0.10, 0.10),
+    leaf_dodge = case_when(
+      month == "March" ~ 0,
+      leaf_age == "old" ~ -0.03,
+      leaf_age == "young" ~ 0.03
+    ),
+    x_final = x_base + x_offset + leaf_dodge + runif(n(), -0.015, 0.015)
+  )
+
+ggplot(df_all_means, aes(x = x_final, y = emmean)) +
+  
+  # Background data points
+  geom_point(
+    data = df_filtered_raw,
+    aes(x = x_final, y = estimate, color = age_class, shape = leaf_age),
+    size = 1.8, alpha = 0.4, show.legend = FALSE
+  ) +
+  
+  # Seasonal trend lines
+  geom_line(
+    data = df_old_means,
+    aes(group = age_class, color = age_class),
+    linewidth = 0.8
+  ) +
+  
+  # Clean black error bars for all 6 points 
+  geom_errorbar(
+    aes(ymin = lower.CL, ymax = upper.CL, group = interaction(age_class, leaf_age)),
+    color = "black", width = 0.03, linewidth = 0.5
+  ) +
+  
+  # Large mean foreground points
+  geom_point(
+    aes(color = age_class, shape = leaf_age),
+    size = 3.6, show.legend = TRUE
+  ) +
+  
+  # Axes adjustments & scale definitions
+  ylim(39, 53) + 
+  scale_x_continuous(breaks = c(1.0, 2.075), labels = c("March", "May")) +
+  scale_shape_manual(values = c("old" = 16, "young" = 17)) +
+  scale_color_manual(values = c("Newly Burnt" = "#c07df0", "Pioneer" = "#7cb815")) +
+  labs(x = "Month", y = "T50 of FvFm (°C)", color = "Age class", shape = "Leaf age") +
+  
+  # Layout aesthetics styling
+  theme_light() +
+  theme(
+    legend.position = "right", 
+    panel.grid.minor = element_blank(),
+    legend.title = element_text(face = "bold"),
+    axis.title = element_text(size = 11)
+  ) +
+  guides(
+    color = guide_legend(override.aes = list(shape = 15, size = 4)), 
+    shape = guide_legend(override.aes = list(size = 3.5, color = "black"))
+  )
+
+# ggsave(
+#   filename = "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/Figures/Figure Ivan.png",
+#   width = 18, height = 12, units = "cm", dpi = 300
+# )
+
+```
 
 # Effect of traits on T50
 
@@ -1749,7 +1903,7 @@ traits_data <- data |>
   filter(proj_2025 == "Traits") |> 
   filter(!(month == "March" &
              age_class %in% c("Mature", "Building"))) |>  # We did not keep MAT and BUI in March because we didn't estimate T50.
-  select(site_name, species, month, age_class, plant_nr, leaf_age, height_flower, height_vegetative, leaf_area, wet_mass, dry_mass, SLA, LDMC)
+  dplyr::select(site_name, species, month, age_class, plant_nr, leaf_age, height_flower, height_vegetative, leaf_area, wet_mass, dry_mass, SLA, LDMC)
   
 united_columns_traits_plante <- unite(
   traits_data,
@@ -1933,7 +2087,7 @@ anova(mod_hveg)
 **Summary of Univariate ANOVA Models on Functional Traits**
 
 | Functional Trait | Age Class Effect (`age_class`) | Season Effect (`month`) | Interaction Effect (`Age x Month`) |
-|:-----------------|:----------------:|:----------------:|:----------------:|
+|:---|:--:|:--:|:--:|
 | SLA (Specific Leaf Area) | Ultra-significant (\*\*\*) | Ultra-significant (\*\*\*) | Non-significant |
 | LDMC (Leaf Dry Matter Content) | Non-significant | Ultra-significant (\*\*\*) | Non-significant |
 | Leaf Area | Ultra-significant (\*\*\*) | Marginal / Tendency (.) | Non-significant |
