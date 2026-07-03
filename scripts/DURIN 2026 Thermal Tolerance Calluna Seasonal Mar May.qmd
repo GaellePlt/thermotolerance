@@ -22,6 +22,7 @@ library(stringr) # String and character text
 library(future) # Using severals cores at the same time
 library(ggcorrplot)
 library(emmeans)
+library(car) # for the Anova
 ```
 
 November and January data (collected by Bente)
@@ -1574,6 +1575,8 @@ performance::check_model(modele_lm_1)
 
 print(Anova(modele_lm_1, type = "II")) #, white.adjust = "hc3" # mois très significatif quand on l'enlève
 
+emmeans(modele_lm_1, ~ month)
+pairs(emmeans(modele_lm_1, ~ month))
 ```
 
 ```{r}
@@ -1775,7 +1778,12 @@ TTHot_wide_old_young <- TTHot_wide_plant |>
 modele_lm_2 <- lm(estimate ~ leaf_age * age_class, data = TTHot_wide_old_young)
 performance::check_model(modele_lm_2)
 
+summary(modele_lm_2)
+
 print(Anova(modele_lm_2, type = "II"))
+
+emmeans(modele_lm_2, ~ leaf_age)
+pairs(emmeans(modele_lm_2, ~ leaf_age))
 
 ```
 
@@ -2087,7 +2095,7 @@ anova(mod_hveg)
 **Summary of Univariate ANOVA Models on Functional Traits**
 
 | Functional Trait | Age Class Effect (`age_class`) | Season Effect (`month`) | Interaction Effect (`Age x Month`) |
-|:---|:--:|:--:|:--:|
+|:-----------------|:----------------:|:----------------:|:----------------:|
 | SLA (Specific Leaf Area) | Ultra-significant (\*\*\*) | Ultra-significant (\*\*\*) | Non-significant |
 | LDMC (Leaf Dry Matter Content) | Non-significant | Ultra-significant (\*\*\*) | Non-significant |
 | Leaf Area | Ultra-significant (\*\*\*) | Marginal / Tendency (.) | Non-significant |
