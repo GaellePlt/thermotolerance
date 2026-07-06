@@ -1931,7 +1931,7 @@ united_columns_traits_plante <- unite(
 # create data frame with T50 estimate for Hot tolerance
 united_columns_HT50_plante <- TTHot_wide_plant |> 
   filter(metric == "T50") |> 
-  select(site_name, species, month, age_class, plant_nr, leaf_age, estimate, se, lower, upper) |> # carefull in the metric we only want T50 
+  dplyr::select(site_name, species, month, age_class, plant_nr, leaf_age, estimate, se, lower, upper) |> # carefull in the metric we only want T50 
   unite(
     col = "new_id",
     site_name, species, month, age_class, plant_nr, leaf_age,
@@ -1996,7 +1996,7 @@ joint_traits_HT50_NB_PIO_old_scaled <- joint_traits_HT50_NB_PIO_old |>
 #| label: Correlation-between-traits
 
 traits_data_corr <- joint_traits_HT50_NB_PIO_old |>
-  select(height_flower, height_vegetative, dry_mass, wet_mass, leaf_area, SLA, LDMC)
+  dplyr::select(height_flower, height_vegetative, dry_mass, wet_mass, leaf_area, SLA, LDMC)
 
 corr_matrix = round(cor(traits_data_corr, use = "complete.obs"), 2) #ignoring NA
 ggcorrplot(corr_matrix, hc.order = TRUE, type = "lower", lab = TRUE)
@@ -2012,7 +2012,7 @@ ggcorrplot(corr_matrix, hc.order = TRUE, type = "lower", lab = TRUE)
 
 traits_data_2 <- data |>
   filter(proj_2025 == "Traits") |>
-  select(height_vegetative, leaf_area, SLA, LDMC)
+  dplyr::select(height_vegetative, leaf_area, SLA, LDMC)
 
 corr_matrix = round(cor(traits_data_2, use = "complete.obs"), 2) #ignoring NA
 ggcorrplot(corr_matrix, hc.order = TRUE, type = "lower", lab = TRUE)
@@ -2024,10 +2024,10 @@ ggcorrplot(corr_matrix, hc.order = TRUE, type = "lower", lab = TRUE)
 #| label: Data-frame
 
 joint_traits_HT50_NB_PIO_old <- joint_traits_HT50_NB_PIO_old |>
-  select(-c(height_flower, wet_mass, dry_mass))
+  dplyr::select(-c(height_flower, wet_mass, dry_mass))
 
 joint_traits_HT50_NB_PIO_old_scaled <- joint_traits_HT50_NB_PIO_old_scaled |>
-  select(-c(height_flower, wet_mass, dry_mass))
+  dplyr::select(-c(height_flower, wet_mass, dry_mass))
 ```
 
 #### Trait-by-trait models
@@ -2111,6 +2111,7 @@ mod_final_additif <- lm(estimate ~ SLA_scaled + leaf_area_scaled + LDMC_scaled +
 
 
 mod_final_interaction <- lm(estimate ~ (SLA_scaled + leaf_area_scaled + LDMC_scaled + height_vegetative_scaled) * month, data = joint_traits_HT50_NB_PIO_old_scaled) 
+
 
 AIC(mod_final_additif, mod_final_interaction)
 
@@ -2205,4 +2206,144 @@ print(p_height)
 #   strip.text = element_text(size = 11, face = "bold"), 
 #   plot.title = element_text(hjust = 0.5, face = "bold", size = 14)
 # )
+```
+
+```{r}
+#| label: prediction-effect
+#| warning: false
+
+
+library(ggeffects)
+library(patchwork)
+
+# Prédictions
+pred_SLA <- ggpredict(mod_final_interaction,
+                      terms = c("SLA_scaled", "month"))
+
+pred_LDMC <- ggpredict(mod_final_interaction,
+                       terms = c("LDMC_scaled", "month"))
+
+pred_LA <- ggpredict(mod_final_interaction,
+                     terms = c("leaf_area_scaled", "month"))
+
+pred_H <- ggpredict(mod_final_interaction,
+                    terms = c("height_vegetative_scaled", "month"))
+
+# Fonction pour tracer les prédictions
+plot_pred <- function(pred, xlab){
+
+  ggplot(pred,
+         aes(x = x,
+             y = predicted,
+             colour = group,
+             fill = group)) +
+
+    geom_line(linewidth = 1.2) +
+
+    geom_ribbon(aes(ymin = conf.low,
+                    ymax = conf.high),
+                alpha = 0.2,
+                colour = NA) +
+
+    labs(x = xlab,
+         y = "T50 of Fv/Fm",
+         colour = "Month",
+         fill = "Month") +
+
+    theme_classic(base_size = 14)
+
+}
+
+# Les quatre graphiques
+p1 <- plot_pred(pred_SLA, "SLA")
+p2 <- plot_pred(pred_LDMC, "LDMC")
+p3 <- plot_pred(pred_LA, "Leaf area")
+p4 <- plot_pred(pred_H, "Height")
+
+# Assemblage
+(p1 | p2) /
+(p3 | p4)
+```
+
+```{r}
+#| label: prediction-effect
+#| warning: false
+library(broom)
+
+
+coef_mod <- tidy(mod_final_interaction, conf.int = TRUE) |>
+  filter(term != "(Intercept)")
+
+coef_mod <- coef_mod |>
+  mutate(
+    term = dplyr::recode(term,
+      "SLA_scaled" = "SLA",
+      "leaf_area_scaled" = "Leaf area",
+      "LDMC_scaled" = "LDMC",
+      "height_vegetative_scaled" = "Vegetative height",
+
+      "monthMay" = "Month: May",
+
+      "SLA_scaled:monthMay" = "SLA × May",
+      "leaf_area_scaled:monthMay" = "Leaf area × May",
+      "LDMC_scaled:monthMay" = "LDMC × May",
+      "height_vegetative_scaled:monthMay" = "Vegetative height × May"
+    ),
+
+    type = ifelse(grepl("×", term), "Interaction", "Main effect")
+  )
+
+coef_mod$term <- factor(
+  coef_mod$term,
+  levels = c(
+    "Month: May",
+    "SLA",
+    "Leaf area",
+    "LDMC",
+    "Vegetative height",
+    "SLA × May",
+    "Leaf area × May",
+    "LDMC × May",
+    "Vegetative height × May"
+  )
+)
+
+# Forest plot
+ggplot(coef_mod,
+       aes(x = estimate,
+           y = term)) +
+
+
+  geom_vline(xintercept = 0,
+             linetype = "dashed",
+             colour = "grey50") +
+
+
+  geom_hline(yintercept = c(1.5, 5.5),
+             colour = "grey75",
+             linewidth = 0.6) +
+
+
+  geom_errorbar(
+    aes(xmin = conf.low,
+        xmax = conf.high),
+    width = 0.15,
+    linewidth = 0.8
+  ) +
+
+
+  geom_point(size = 3.5) +
+
+  labs(
+    x = expression(Standardized~coefficient~(beta)),
+    y = NULL
+  ) +
+
+  theme_classic(base_size = 15) +
+
+  theme(
+    legend.position = "none",
+    axis.text.y = element_text(size = 12),
+    axis.title.x = element_text(size = 14)
+  )
 ```
