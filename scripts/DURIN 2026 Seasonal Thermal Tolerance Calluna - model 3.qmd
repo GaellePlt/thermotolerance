@@ -1,0 +1,450 @@
+---
+title: "DURIN 2026 Thermal Tolerance Calluna Model 3"
+author: "Sonya R Geange and Gaëlle Poulat"
+format: html
+editor: visual
+---
+
+# Import data
+
+```{r}
+#| label: Create-united-columns-traits-data-frame
+
+traits_data <- data |> 
+  filter(proj_2025 == "Traits") |> 
+  filter(!(month == "March" &
+             age_class %in% c("Mature", "Building"))) |>  # We did not keep MAT and BUI in March because we didn't estimate T50.
+  dplyr::select(site_name, species, month, age_class, plant_nr, leaf_age, height_flower, height_vegetative, leaf_area, wet_mass, dry_mass, SLA, LDMC)
+  
+united_columns_traits_plante <- unite(
+  traits_data,
+  col = "new_id",
+  site_name, species, month,  age_class, plant_nr,leaf_age,
+  sep = "_",
+  remove = TRUE
+) |> 
+  na.omit()
+```
+
+# Hot T50
+
+```{r}
+#| label: Create-joint-data-frame-HT50-traits
+
+# create data frame with T50 estimate for Hot tolerance
+united_columns_HT50_plante <- TTHot_wide_plant |> 
+  filter(metric == "T50") |> 
+  dplyr::select(site_name, species, month, age_class, plant_nr, leaf_age, estimate, se, lower, upper) |> # carefull in the metric we only want T50 
+  unite(
+    col = "new_id",
+    site_name, species, month, age_class, plant_nr, leaf_age,
+    sep = "_",
+    remove = TRUE
+  ) |> 
+  na.omit()
+
+# create a joint data frame with trais and T50
+united_columns_joint_traits_HT50 <- left_join(united_columns_traits_plante, united_columns_HT50_plante, by = "new_id")
+
+# String split back to columns the ID
+joint_traits_HT50_wide <- united_columns_joint_traits_HT50 |> 
+  separate_wider_delim(
+    cols = new_id, 
+    delim = "_", 
+    names = c("site_name", "species", "month", "age_class", "plant_nr", "leaf_age")
+  ) |> 
+  mutate(
+    # Check the data type of the new output columns and convert if necessary
+    across(c(site_name, species, plant_nr, leaf_age), factor),
+    # Relevel factors in natural order
+    month = factor(month, levels = c("March", "May")),
+    age_class = factor(age_class, levels = c("Newly Burnt", "Pioneer", "Building", "Mature"))
+  )
+```
+
+```{r}
+#| label: Scale-joint-data-frame-HT50-traits
+
+joint_traits_HT50_scaled <- joint_traits_HT50_wide |> 
+  mutate(
+    across(c(height_flower, height_vegetative, leaf_area, wet_mass, dry_mass, SLA, LDMC), ~ as.numeric(as.character(.x))),
+    across(c(height_flower, height_vegetative, leaf_area, wet_mass, dry_mass, SLA, LDMC), ~ as.numeric(scale(.x)), .names = "{.col}_scaled")
+  )
+
+```
+
+## March, May, NB, PIO, old
+
+```{r}
+#| label: Create-data-frame
+
+joint_traits_HT50_NB_PIO_old <- joint_traits_HT50_wide |>
+  filter(age_class %in% c("Newly Burnt", "Pioneer")) |>
+  filter(leaf_age %in% c("old"))
+```
+
+```{r}
+#| label: Create-scaled-data-frame
+
+joint_traits_HT50_NB_PIO_old_scaled <- joint_traits_HT50_NB_PIO_old |> 
+  mutate(
+    across(c(height_flower, height_vegetative, leaf_area, wet_mass, dry_mass, SLA, LDMC), ~ as.numeric(as.character(.x))),
+    across(c(height_flower, height_vegetative, leaf_area, wet_mass, dry_mass, SLA, LDMC), ~ as.numeric(scale(.x)), .names = "{.col}_scaled")
+  )
+```
+
+```{r}
+#| label: Correlation-between-traits
+
+traits_data_corr <- joint_traits_HT50_NB_PIO_old |>
+  dplyr::select(height_flower, height_vegetative, dry_mass, wet_mass, leaf_area, SLA, LDMC)
+
+corr_matrix = round(cor(traits_data_corr, use = "complete.obs"), 2) #ignoring NA
+ggcorrplot(corr_matrix, hc.order = TRUE, type = "lower", lab = TRUE)
+
+# Cut-off value : 0.70 --> literature
+# dry_mass and wet_mass : 0.85
+# leaf_area and dry_mass : 0.76
+# leaf_area and wet_mass : 0.77
+# height_flower and heigth_vegetative : 0.95
+
+# We removed wet and dry mass because they are correlated with leaf area and with each other, and they are already represented in the LDMC.
+# Between vegetative and flowering height, we removed flowering height because the experiment focuses on leaves.
+
+traits_data_2 <- data |>
+  filter(proj_2025 == "Traits") |>
+  dplyr::select(height_vegetative, leaf_area, SLA, LDMC)
+
+corr_matrix = round(cor(traits_data_2, use = "complete.obs"), 2) #ignoring NA
+ggcorrplot(corr_matrix, hc.order = TRUE, type = "lower", lab = TRUE)
+
+# Four variables left for the model
+```
+
+```{r}
+#| label: Data-frame
+
+joint_traits_HT50_NB_PIO_old <- joint_traits_HT50_NB_PIO_old |>
+  dplyr::select(-c(height_flower, wet_mass, dry_mass))
+
+joint_traits_HT50_NB_PIO_old_scaled <- joint_traits_HT50_NB_PIO_old_scaled |>
+  dplyr::select(-c(height_flower, wet_mass, dry_mass))
+```
+
+#### Trait-by-trait models
+
+```{r}
+#| label: SLA ~ age_class * month
+#| fig-height: 10
+
+mod_SLA  <- lm(SLA ~ age_class * month, data = joint_traits_HT50_NB_PIO_old)
+performance::check_model(mod_SLA)
+
+anova(mod_SLA)
+
+# 1. Normality (Q-Q Plot): Valid. Most residuals follow the line well. 
+#    Minor deviation at the upper tail (plants 77, 87, 89) but nothing critical.
+# 2. Homoscedasticity: Valid. Residuals are evenly distributed across groups 
+#    (the reference line remains flat and horizontal).
+# 3. Collinearity: Low (VIF < 5 for all terms).
+```
+
+```{r}
+#| label: LDMC ~ age_class * month
+#| fig-height: 10
+mod_LDMC <- lm(LDMC ~ age_class * month, data = joint_traits_HT50_NB_PIO_old)
+performance::check_model(mod_LDMC)
+
+anova(mod_LDMC)
+
+# 1. Normality (Q-Q Plot): Valid. Residuals follow the line.
+# 2. Homoscedasticity: Valid. Residuals show a stable distribution across groups
+#    (the reference line is slightly curved but acceptable).
+# 3. Collinearity: Low (VIF < 5 for all terms). 
+```
+
+```{r}
+#| label: leaf_area ~ age_class * month
+#| fig-height: 10
+mod_LA   <- lm(leaf_area ~ age_class * month, data = joint_traits_HT50_NB_PIO_old)
+performance::check_model(mod_LA)
+
+anova(mod_LA)
+
+# 1. Normality (Q-Q Plot): Valid. Residuals follow the line closely, with a very slight deviation at the right tail, which is acceptable.
+# 2. Homoscedasticity: Valid. Uniform spread of residuals across fitted values 
+#    (the reference line is straight and horizontal).
+# 3. Collinearity: Low (VIF < 5). 
+```
+
+```{r}
+#| label: height_vegetative ~ age_class * month
+#| fig-height: 10
+mod_hveg <- lm(height_vegetative ~ age_class * month, data = joint_traits_HT50_NB_PIO_old)
+performance::check_model(mod_hveg)
+
+anova(mod_hveg)
+
+# 1. Normality (Q-Q Plot): Valid. Residuals follow the reference line.
+# 2. Homoscedasticity: Valid. Residual distribution is stable (the slight upward 
+#    curve at the right edge is minor and acceptable given the extreme F-value).
+# 3. Collinearity: Low (VIF < 5). No issues.
+
+# Note on F-value (1659.4): explain by the height difference between Newly Burnt (small resprouts) and Pioneer (tall bushes) 
+```
+
+**Summary of Univariate ANOVA Models on Functional Traits**
+
+| Functional Trait | Age Class Effect (`age_class`) | Season Effect (`month`) | Interaction Effect (`Age x Month`) |
+|:-----------------|:----------------:|:----------------:|:----------------:|
+| SLA (Specific Leaf Area) | Ultra-significant (\*\*\*) | Ultra-significant (\*\*\*) | Non-significant |
+| LDMC (Leaf Dry Matter Content) | Non-significant | Ultra-significant (\*\*\*) | Non-significant |
+| Leaf Area | Ultra-significant (\*\*\*) | Marginal / Tendency (.) | Non-significant |
+| Height (Vegetative) | Ultra-significant (\*\*\*) | Ultra-significant (\*\*\*) | Ultra-significant (\*\*\*) |
+
+#### Final model
+
+```{r}
+#| label: Final-model
+#| fig-height: 10
+
+mod_final_additif <- lm(estimate ~ SLA_scaled + leaf_area_scaled + LDMC_scaled + height_vegetative_scaled + month, data = joint_traits_HT50_NB_PIO_old_scaled) 
+
+
+mod_final_interaction <- lm(estimate ~ (SLA_scaled + leaf_area_scaled + LDMC_scaled + height_vegetative_scaled) * month, data = joint_traits_HT50_NB_PIO_old_scaled) 
+
+
+AIC(mod_final_additif, mod_final_interaction)
+
+# Le modèle avec interaction (mod_final_interaction) a un AIC plus bas de $8.66$ points par rapport au modèle additif.En statistiques (et plus particulièrement avec le critère de l'AIC), dès qu'une différence est supérieure à $2$ points, le modèle avec l'AIC le plus bas est considéré comme significativement meilleur. Une différence de près de $9$ points est donc un signal très fort.
+
+performance::check_model(mod_final_interaction)
+
+# 1. Normality (Q-Q Plot): Valid. Residuals follow the reference line tightly.
+# 2. Collinearity (VIF): Valid. Low to moderate VIF (< 6) across all terms, 
+#    which is exceptionally clean for a complex interaction model.
+# 3. Homoscedasticity: Acceptable. Minor hump in residual spread for intermediate 
+#    fitted values, but well within normal limits for ecological field data.
+# 4. Influential Observations: No overly influential outliers detected.
+
+summary(mod_final_interaction)
+```
+
+```{r}
+#| label: effect-of-traits-on-T50
+#| warning: false
+
+class_colors <- c("Newly Burnt" = "#D95F02", "Pioneer" = "#1B7C7A")
+class_shapes <- c("Newly Burnt" = 16, "Pioneer" = 17)
+
+common_style <- list(
+  facet_wrap(~ month),
+  scale_color_manual(values = class_colors, name = "Age Class"),
+  scale_shape_manual(values = class_shapes, name = "Age Class"),
+  theme_classic(base_size = 12),
+  theme(
+    panel.background = element_rect(fill = "#FAFAFA", color = NA),
+    strip.background = element_blank(),
+    strip.text = element_text(face = "bold", size = 13, color = "#333333"),
+    legend.position = "bottom" 
+  )
+)
+
+p_sla <- ggplot(joint_traits_HT50_NB_PIO_old_scaled, aes(x = SLA, y = estimate)) +
+  geom_smooth(method = "lm", color = "#222222", fill = "grey85", linetype = "solid", size = 0.7, alpha = 0.5) +
+  geom_point(aes(color = age_class, shape = age_class), size = 2.5, alpha = 0.8) + 
+  labs(x = "SLA (mm²/g)", y = "T50 (°C)") +
+  common_style
+
+p_ldmc <- ggplot(joint_traits_HT50_NB_PIO_old_scaled, aes(x = LDMC, y = estimate)) +
+  geom_smooth(method = "lm", color = "#222222", fill = "grey85", linetype = "solid", size = 0.7, alpha = 0.5) +
+  geom_point(aes(color = age_class, shape = age_class), size = 2.5, alpha = 0.8) + 
+  labs(x = "LDMC", y = "T50 (°C)") +
+  common_style
+
+p_area <- ggplot(joint_traits_HT50_NB_PIO_old_scaled, aes(x = leaf_area, y = estimate)) +
+  geom_smooth(method = "lm", color = "#222222", fill = "grey85", linetype = "solid", size = 0.7, alpha = 0.5) +
+  geom_point(aes(color = age_class, shape = age_class), size = 2.5, alpha = 0.8) + 
+  labs(x = "Leaf Area (mm²)", y = "T50 (°C)") +
+  common_style
+
+
+p_height <- ggplot(joint_traits_HT50_NB_PIO_old_scaled, aes(x = height_vegetative, y = estimate)) +
+  geom_smooth(method = "lm", color = "#222222", fill = "grey85", linetype = "solid", size = 0.7, alpha = 0.5) +
+  geom_point(aes(color = age_class, shape = age_class), size = 2.5, alpha = 0.8) + 
+  labs(x = "Height vegetative (cm)", y = "T50 (°C)") +
+  common_style
+
+print(p_sla)
+print(p_ldmc)
+print(p_area)
+print(p_height)
+
+```
+
+```{r}
+#| label: Correlation-matrix-of-functional-traits-and-T50
+# #| warning: false
+# 
+# # if(!require(GGally)) install.packages("GGally")
+# # if(!require(ggplot2)) install.packages("ggplot2")
+# 
+# library(GGally)
+# 
+# 
+# traits_HT50 <- joint_traits_HT50_NB_PIO_old[, c("estimate", "SLA", "height_vegetative", "leaf_area", "LDMC")]
+# 
+# 
+# ggpairs(
+#   traits_HT50,
+#   upper = list(continuous = wrap("cor", method = "pearson", size = 4.5)),
+#   diag = list(continuous = wrap("densityDiag", fill = "lightgray", alpha = 0.5)),
+#   lower = list(continuous = wrap("smooth", method = "lm", color = "blue", alpha = 0.3, size = 0.5))
+# ) +
+# theme_bw() + 
+# labs(title = "Correlation matrix of functional traits and T50") +
+# theme(
+#   strip.text = element_text(size = 11, face = "bold"), 
+#   plot.title = element_text(hjust = 0.5, face = "bold", size = 14)
+# )
+```
+
+```{r}
+#| label: prediction-effect
+#| warning: false
+
+
+library(ggeffects)
+library(patchwork)
+
+# Prédictions
+pred_SLA <- ggpredict(mod_final_interaction,
+                      terms = c("SLA_scaled", "month"))
+
+pred_LDMC <- ggpredict(mod_final_interaction,
+                       terms = c("LDMC_scaled", "month"))
+
+pred_LA <- ggpredict(mod_final_interaction,
+                     terms = c("leaf_area_scaled", "month"))
+
+pred_H <- ggpredict(mod_final_interaction,
+                    terms = c("height_vegetative_scaled", "month"))
+
+# Fonction pour tracer les prédictions
+plot_pred <- function(pred, xlab){
+
+  ggplot(pred,
+         aes(x = x,
+             y = predicted,
+             colour = group,
+             fill = group)) +
+
+    geom_line(linewidth = 1.2) +
+
+    geom_ribbon(aes(ymin = conf.low,
+                    ymax = conf.high),
+                alpha = 0.2,
+                colour = NA) +
+
+    labs(x = xlab,
+         y = "T50 of Fv/Fm",
+         colour = "Month",
+         fill = "Month") +
+
+    theme_classic(base_size = 14)
+
+}
+
+# Les quatre graphiques
+p1 <- plot_pred(pred_SLA, "SLA")
+p2 <- plot_pred(pred_LDMC, "LDMC")
+p3 <- plot_pred(pred_LA, "Leaf area")
+p4 <- plot_pred(pred_H, "Height")
+
+# Assemblage
+(p1 | p2) /
+(p3 | p4)
+```
+
+```{r}
+#| label: prediction-effect
+#| warning: false
+library(broom)
+
+
+coef_mod <- tidy(mod_final_interaction, conf.int = TRUE) |>
+  filter(term != "(Intercept)")
+
+coef_mod <- coef_mod |>
+  mutate(
+    term = dplyr::recode(term,
+      "SLA_scaled" = "SLA",
+      "leaf_area_scaled" = "Leaf area",
+      "LDMC_scaled" = "LDMC",
+      "height_vegetative_scaled" = "Vegetative height",
+
+      "monthMay" = "Month: May",
+
+      "SLA_scaled:monthMay" = "SLA × May",
+      "leaf_area_scaled:monthMay" = "Leaf area × May",
+      "LDMC_scaled:monthMay" = "LDMC × May",
+      "height_vegetative_scaled:monthMay" = "Vegetative height × May"
+    ),
+
+    type = ifelse(grepl("×", term), "Interaction", "Main effect")
+  )
+
+coef_mod$term <- factor(
+  coef_mod$term,
+  levels = c(
+    "Month: May",
+    "SLA",
+    "Leaf area",
+    "LDMC",
+    "Vegetative height",
+    "SLA × May",
+    "Leaf area × May",
+    "LDMC × May",
+    "Vegetative height × May"
+  )
+)
+
+# Forest plot
+ggplot(coef_mod,
+       aes(x = estimate,
+           y = term)) +
+
+
+  geom_vline(xintercept = 0,
+             linetype = "dashed",
+             colour = "grey50") +
+
+
+  geom_hline(yintercept = c(1.5, 5.5),
+             colour = "grey75",
+             linewidth = 0.6) +
+
+
+  geom_errorbar(
+    aes(xmin = conf.low,
+        xmax = conf.high),
+    width = 0.15,
+    linewidth = 0.8
+  ) +
+
+
+  geom_point(size = 3.5) +
+
+  labs(
+    x = expression(Standardized~coefficient~(beta)),
+    y = NULL
+  ) +
+
+  theme_classic(base_size = 15) +
+
+  theme(
+    legend.position = "none",
+    axis.text.y = element_text(size = 12),
+    axis.title.x = element_text(size = 14)
+  )
+```
