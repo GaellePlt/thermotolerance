@@ -2093,7 +2093,7 @@ anova(mod_hveg)
 **Summary of Univariate ANOVA Models on Functional Traits**
 
 | Functional Trait | Age Class Effect (`age_class`) | Season Effect (`month`) | Interaction Effect (`Age x Month`) |
-|:-----------------|:----------------:|:----------------:|:----------------:|
+|:---|:--:|:--:|:--:|
 | SLA (Specific Leaf Area) | Ultra-significant (\*\*\*) | Ultra-significant (\*\*\*) | Non-significant |
 | LDMC (Leaf Dry Matter Content) | Non-significant | Ultra-significant (\*\*\*) | Non-significant |
 | Leaf Area | Ultra-significant (\*\*\*) | Marginal / Tendency (.) | Non-significant |
