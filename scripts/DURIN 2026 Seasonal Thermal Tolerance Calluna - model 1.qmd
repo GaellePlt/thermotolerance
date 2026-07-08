@@ -1,0 +1,36 @@
+---
+title: "DURIN 2026 Thermal Tolerance Calluna Model 1"
+author: "Sonya R Geange and Gaëlle Poulat"
+format: html
+editor: visual
+---
+
+## Effect of leaf age on T50
+
+```{r}
+#| label: Create-data-May-old-young
+
+TTHot_wide_old_young <- TTHot_wide_plant |>
+  filter(month %in% c("May")) |>
+  filter(metric %in% c("T50"))
+```
+
+```{r}
+#| label: LM-May-old-young
+#| fig-height: 10
+
+modele_lm_2 <- lm(estimate ~ leaf_age * age_class, data = TTHot_wide_old_young)
+performance::check_model(modele_lm_2)
+
+summary(modele_lm_2)
+
+print(Anova(modele_lm_2, type = "II"))
+
+emmeans(modele_lm_2, ~ leaf_age)
+pairs(emmeans(modele_lm_2, ~ leaf_age))
+
+```
+
+```{r}
+#| label: figure-young-old
+```
