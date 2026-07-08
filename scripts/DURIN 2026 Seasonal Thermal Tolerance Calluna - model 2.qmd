@@ -1,0 +1,348 @@
+---
+title: "DURIN 2026 Thermal Tolerance Calluna Model 2"
+author: "Sonya R Geange and Gaëlle Poulat"
+format: html
+editor: visual
+---
+
+# Import data
+
+```{r}
+
+```
+
+# Effect of age classe, season and their interaction on T50
+
+## Hot T50
+
+### March-May-NB-PIO-old
+
+```{r}
+#| label: Create-data-frame-Nov-Jan-March-May-NB-PIO-old
+
+TTHot_wide_NB_PIO_old <- TTHot_wide_plant |>
+  filter(age_class %in% c("Newly Burnt", "Pioneer")) |>
+  filter(leaf_age %in% c("old")) |>
+  filter(metric %in% c("T50"))
+```
+
+```{r}
+#| label: LM-March-May-old-NB-PIO
+#| fig-height: 10
+
+# In March, only leaves from the previous year (2025, classified as "old") were available. Although new leaves had emerged by May ("young"), the analysis was restricted to the 2025 cohort ("old") to ensure physiological comparability between the two sampling months.
+
+# The "Building" and "Mature" age classes were excluded from the analysis. In March, individuals from these cohorts suffered total mortality prior to measurements, preventing any estimation of their T50. Consequently, this study focuses exclusively on the "Newly Burnt" and "Pioneer" classes.
+
+
+modele_lm_1 <- lm(estimate ~ month * age_class, data = TTHot_wide_NB_PIO_old)
+performance::check_model(modele_lm_1)
+# type = "II": Adjusts the ANOVA for an unbalanced design (unequal sample sizes due to NAs) by testing each main effect independently of the order of factors.
+
+# white.adjust = "hc3": Applies White's correction (HC3) to account for heteroscedasticity (unstable residual variance in May), ensuring robust p-values for small sample sizes. https://bsapubs.onlinelibrary.wiley.com/doi/epdf/10.1002/ajb2.16464
+
+# Assumption for white.adjust: independance --> ok 
+
+print(Anova(modele_lm_1, type = "II")) #, white.adjust = "hc3" # mois très significatif quand on l'enlève
+
+emmeans(modele_lm_1, ~ month)
+pairs(emmeans(modele_lm_1, ~ month))
+```
+
+```{r}
+#| label: Post-hoc-test-month
+library(emmeans)
+library(multcomp)
+
+comp_mois <- emmeans(modele_lm_1, specs = pairwise ~ month)
+summary(comp_mois$contrasts)
+
+valeurs_mois <- emmeans(modele_lm_1, ~ month)
+
+cld(valeurs_mois, Letters = letters)
+```
+
+```{r}
+#| label: box-plot-month
+#| warning: false
+library(patchwork)
+
+posthoc_letters <- data.frame(
+  month = c("May", "March"),
+  letter = c("a", "b"),
+  y_pos = c(51.5, 53) 
+)
+
+g1 <- ggplot(TTHot_wide_NB_PIO_old, aes(
+  x = month,
+  y = estimate
+)) +
+  stat_boxplot(geom = "errorbar", width = 0.07, color = "grey30") +
+  geom_boxplot(width = 0.15, alpha = 1, outlier.shape = NA, color = "grey30", fill = "grey95") + 
+  
+  geom_jitter(
+    aes(color = age_class, shape = age_class),
+    width = 0.1, size = 1.5, alpha = 0.8
+  ) + 
+  
+  geom_text(
+    data = posthoc_letters,
+    aes(x = month, y = y_pos, label = letter),
+    inherit.aes = FALSE, size = 5, color = "black"
+  ) +
+  labs(x = "Month", y = "T50 (°C)") + 
+  scale_color_manual(values = c("Newly Burnt" = "#c07df0", "Pioneer" = "#7cb815")) +
+  stat_summary(
+    aes(group = month),
+    fun.data = function(y) { data.frame(y = 39, label = paste0("n = ", length(y))) },
+    geom = "text", color = "grey60", size = 3.2, vjust = 0
+  ) +
+  theme_light() + 
+  theme(
+    legend.position = "none", 
+    panel.grid.minor = element_blank()
+  )
+
+
+g2 <- ggplot(TTHot_wide_NB_PIO_old, aes(
+  x = month,
+  y = estimate,
+  group = age_class
+)) +
+  geom_jitter(
+    aes(color = age_class, shape = age_class),
+    size = 2, alpha = 1, position = position_jitter(width = 0.1, height = 0, seed = 42)
+  ) +
+  stat_summary(
+    aes(linetype = age_class), 
+    fun = mean, geom = "line", color = "black", linewidth = 0.6            
+  ) +
+  labs(
+    x = "Month", 
+    y = "T50 (°C)", 
+    color = "Age Class", 
+    shape = "Age Class", 
+    linetype = "Age Class"
+  ) +
+  stat_summary(
+    aes(group = month),
+    fun.data = function(y) { data.frame(y = 39, label = paste0("n = ", length(y))) },
+    geom = "text", color = "grey60", size = 3.2, vjust = 0
+  ) +
+  scale_color_manual(values = c("Newly Burnt" = "#c07df0", "Pioneer" = "#7cb815")) +
+  guides(
+    color = guide_legend(override.aes = list(size = 3, alpha = 1)),
+    shape = guide_legend(override.aes = list(size = 3)),
+    linetype = guide_legend()
+  ) +
+  theme_light() +
+  theme(
+    legend.position = "right", 
+    panel.grid.minor = element_blank()
+  )
+
+# 4. Assembly and Display
+figure_finale <- g1 + g2 + plot_annotation(tag_levels = 'A')+
+  plot_layout(axes = "collect")
+figure_finale
+
+
+ggsave(
+  filename = "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/Figures/Thermal Tolerance (T50) Evolution by month.png",
+  plot = figure_finale,
+  width = 18, height = 12, units = "cm", dpi = 300
+)
+```
+
+```{r}
+#| label: figure
+#| warning: false
+
+
+library(emmeans)
+
+mod_means <- emmeans(modele_lm_1, specs = ~ month * age_class)
+df_means  <- as.data.frame(mod_means)
+
+set.seed(42)
+
+ggplot(TTHot_wide_NB_PIO_old, aes(x = month, y = estimate, group = age_class)) +
+  
+  geom_jitter(
+    aes(color = age_class, shape = age_class),
+    width = 0.15, height = 0, size = 1.8, alpha = 0.5
+  ) +
+  
+  geom_line(
+    data = df_means,
+    aes(y = emmean, linetype = age_class, color = age_class),
+    linewidth = 0.8,
+    position = position_dodge(width = 0.15)
+  ) +
+
+  geom_errorbar(
+    data = df_means,
+    aes(y = emmean, ymin = lower.CL, ymax = upper.CL, color = age_class), 
+    width = 0.08,             
+    linewidth = 0.4, 
+    position = position_dodge(width = 0.15) 
+  ) +
+
+  geom_point(
+    data = df_means,
+    aes(y = emmean, color = age_class, shape = age_class), 
+    size = 3,
+    position = position_dodge(width = 0.15)
+  ) +
+
+  ylim(39, 53) + 
+  labs(
+    x = "Month",
+    y = "T50 (°C)",
+    color = "Age Class",
+    shape = "Age Class",
+    linetype = "Age Class"
+  ) +
+  
+  scale_color_manual(values = c("Newly Burnt" = "#c07df0", "Pioneer" = "#7cb815")) +
+
+  guides(
+    color = guide_legend(override.aes = list(size = 3, alpha = 1)),
+    shape = guide_legend(override.aes = list(size = 3)),
+    linetype = guide_legend()
+  ) +
+  
+  theme_light() +
+  theme(
+    legend.position = "right",
+    panel.grid.minor = element_blank(),
+    legend.title = element_text(face = "bold"),
+    axis.title = element_text(size = 11)
+  )
+
+# ggsave(
+#   filename = "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/Figures/Figure Ivan.png",
+#   width = 18, height = 12, units = "cm", dpi = 300
+# )
+```
+
+## Cold T50
+
+not possible yet with the data of March and May
+
+## Hot seasonal figure
+
+```{r}
+#| label: create-data-frame
+#| warning: false
+
+TTHot_wide_all <- bind_rows(TTHot_wide_old_young, TTHot_wide_NB_PIO_old)
+```
+
+```{r}
+#| label: figure-seasonal-effect
+#| warning: false
+library(dplyr)
+library(ggplot2)
+
+# Extract means from Model 1 (OLD leaves for March and May)
+df_old_means <- emmeans(modele_lm_1, specs = ~ month * age_class) |>
+  as.data.frame() |>
+  filter(age_class %in% c("Newly Burnt", "Pioneer")) |>
+  mutate(
+    leaf_age = "old",
+    x_base = ifelse(month == "March", 1, 2),
+    x_offset = ifelse(age_class == "Newly Burnt", -0.10, 0.10),
+    leaf_dodge = ifelse(month == "May", -0.03, 0),
+    x_final = x_base + x_offset + leaf_dodge
+  )
+
+# Extract means from Model 2 (YOUNG leaves for May only)
+df_young_means <- emmeans(modele_lm_2, specs = ~ leaf_age * age_class) |>
+  as.data.frame() |>
+  filter(leaf_age == "young" & age_class %in% c("Newly Burnt", "Pioneer")) |>
+  mutate(
+    month = "May",
+    x_base = 2, 
+    x_offset = ifelse(age_class == "Newly Burnt", -0.10, 0.10),
+    leaf_dodge = 0.03,
+    x_final = x_base + x_offset + leaf_dodge
+  )
+
+# Combine both mean datasets and force-calculate confidence intervals via SE
+df_all_means <- bind_rows(df_old_means, df_young_means) |>
+  mutate(
+    lower.CL = emmean - (1.96 * SE),
+    upper.CL = emmean + (1.96 * SE)
+  )
+
+# Filter and manually align raw background data points (Removes NA and unwanted groups)
+set.seed(42)
+df_filtered_raw <- TTHot_wide_all |> 
+  filter(age_class %in% c("Newly Burnt", "Pioneer")) |>
+  filter(!is.na(leaf_age)) |>  # Cleans up any NA shapes from the legend
+  mutate(
+    x_base = ifelse(month == "March", 1, 2),
+    x_offset = ifelse(age_class == "Newly Burnt", -0.10, 0.10),
+    leaf_dodge = case_when(
+      month == "March" ~ 0,
+      leaf_age == "old" ~ -0.03,
+      leaf_age == "young" ~ 0.03
+    ),
+    x_final = x_base + x_offset + leaf_dodge + runif(n(), -0.015, 0.015)
+  )
+
+ggplot(df_all_means, aes(x = x_final, y = emmean)) +
+  
+  # Background data points
+  geom_point(
+    data = df_filtered_raw,
+    aes(x = x_final, y = estimate, color = age_class, shape = leaf_age),
+    size = 1.8, alpha = 0.4, show.legend = FALSE
+  ) +
+  
+  # Seasonal trend lines
+  geom_line(
+    data = df_old_means,
+    aes(group = age_class, color = age_class),
+    linewidth = 0.8
+  ) +
+  
+  # Clean black error bars for all 6 points 
+  geom_errorbar(
+    aes(ymin = lower.CL, ymax = upper.CL, group = interaction(age_class, leaf_age)),
+    color = "black", width = 0.03, linewidth = 0.5
+  ) +
+  
+  # Large mean foreground points
+  geom_point(
+    aes(color = age_class, shape = leaf_age),
+    size = 3.6, show.legend = TRUE
+  ) +
+  
+  # Axes adjustments & scale definitions
+  ylim(39, 53) + 
+  scale_x_continuous(breaks = c(1.0, 2.075), labels = c("March", "May")) +
+  scale_shape_manual(values = c("old" = 16, "young" = 17)) +
+  scale_color_manual(values = c("Newly Burnt" = "#c07df0", "Pioneer" = "#7cb815")) +
+  labs(x = "Month", y = "T50 of FvFm (°C)", color = "Age class", shape = "Leaf age") +
+  
+  # Layout aesthetics styling
+  theme_light() +
+  theme(
+    legend.position = "right", 
+    panel.grid.minor = element_blank(),
+    legend.title = element_text(face = "bold"),
+    axis.title = element_text(size = 11)
+  ) +
+  guides(
+    color = guide_legend(override.aes = list(shape = 15, size = 4)), 
+    shape = guide_legend(override.aes = list(size = 3.5, color = "black"))
+  )
+
+# ggsave(
+#   filename = "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/Figures/Figure Ivan.png",
+#   width = 18, height = 12, units = "cm", dpi = 300
+# )
+
+```
