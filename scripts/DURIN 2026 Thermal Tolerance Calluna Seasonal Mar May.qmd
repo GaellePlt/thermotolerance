@@ -1207,8 +1207,6 @@ autoplot(TTHot_plant) # plots logistic curves and dashed lines for Tcrit, T50, T
 TTHot_plant_sum_2 <- TTHot_plant_sum |> 
   filter(
     !is.nan(prop_success) & prop_success >= 0.5,
-    Tcrit.mn < T50.mn,
-    (T50_ci_high - T50_ci_low) <= 5
          )
 ## a expliquer et sourcer
 
