@@ -1,0 +1,497 @@
+---
+title: "DURIN 2026 Thermal Tolerance Calluna T50 Response Curves"
+author: "Sonya R Geange and Gaëlle Poulat"
+format: html
+editor: visual
+---
+
+# Import data 
+
+```{r}
+#| label: importing-clean-data
+
+data <- read.csv("C:/Users/poula/Documents/M2_PAMEQ/Stage M2/Analyse statistique/thermotolerance/data/clean_data/Seasonal Calluna Thermal Tolerance and Plant Functional Traits.csv")
+```
+
+# Hot T50 curves
+
+```{r}
+#| label: Create-hot-data-frame
+# Create table with four columns
+therm_htol <- data |>
+  filter(!(month == "March" &
+             age_class %in% c("Mature", "Building"))) |>  # We did not keep MAT and BUI in March because they were mainly initially dead (based on the Fv/Fm graph). Consequently, we could not obtain a T50 curve or a T50 estimation for those age classes.
+  filter(proj_2025 == "TT Hot") |>
+  select(
+    month,
+    site_name,
+    species,
+    age_class,
+    leaf_age,
+    proj_2025,
+    plant_nr,
+    temp_exp,
+    fv_fm_final
+  )
+```
+
+```{r}
+#| label: concatenated-columns-per-plant
+
+
+# Create concatenated columns for naming
+united_columns_htol_plant <- unite(
+  therm_htol,
+  col = "new_id",
+  site_name,
+  species,
+  age_class,
+  plant_nr,
+  month,
+  leaf_age,
+  proj_2025,
+  sep = "_",
+  remove = TRUE
+) |>
+  na.omit()
+
+# NA for BUI 4 14 May young 
+# NA for PIO 1 7 Nov
+# NA for BUI 3 May old, BUI 2 May young, MAT 7 May young --> no leaf harvested
+```
+
+## Removing plants
+
+```{r}
+# #| label:  plants-removed-from-T50-estimate
+# ## Plants that crashed the script to estimate T50
+# 
+# removed <- united_columns_htol_plant |>
+#   filter(
+#     new_id %in% c(
+#       "Lygra_Calluna vulgaris_Mature_8_May_old_TT Hot",
+#       "Lygra_Calluna vulgaris_Building_4_May_young_TT Hot",
+#       "Lygra_Calluna vulgaris_Mature_4_May_young_TT Hot",
+#       "Lygra_Calluna vulgaris_Pioneer_8_May_young_TT Hot"
+#     )
+#   )
+# 
+# removed |>
+#   mutate(temp_exp = as.numeric(as.character(temp_exp)),
+#          fv_fm_final = as.numeric(as.character(fv_fm_final))) |>
+#   ggplot(aes(x = temp_exp, y = fv_fm_final, color = new_id)) +
+#   facet_grid(new_id ~ .) +
+#   geom_line()
+```
+
+```{r}
+# #| label: concatenated-columns-per-plant-cleaned
+# 
+# united_columns_htol_plant |> 
+#  filter(
+#     !new_id %in% c(
+#       "Lygra_Calluna vulgaris_Mature_8_May_old_TT Hot",
+#       "Lygra_Calluna vulgaris_Building_4_May_young_TT Hot",
+#       "Lygra_Calluna vulgaris_Mature_4_May_young_TT Hot",
+#       "Lygra_Calluna vulgaris_Pioneer_8_May_young_TT Hot"
+#     )
+#   ) # removed because they crashed the T50 estimate script
+```
+
+## Curves
+
+```{r}
+#| label: T50-curves-and-plots-per-plant
+#| warning: false
+
+# install.packages("remotes")
+# remotes::install_github("richardjtelford/thermalTolerance")
+library(thermalTolerance)
+
+library(future)
+plan(sequential)
+plan(multisession) # activate parallel processing
+set.seed(19) # avoir la même chose a chaque fois comme ça il n'y a pas des moments où ça marche et d'autres non  
+
+
+TTHot_plant <- psiiht(temperature = as.numeric(as.character(united_columns_htol_plant$temp_exp)), 
+               warming = TRUE,
+               fvfm = as.numeric(as.character(united_columns_htol_plant$fv_fm_final)),
+               control_temp = 20,
+               id = united_columns_htol_plant$new_id,
+               boots = 1000)# put 1000
+
+TTHot_plant_sum <- summary(TTHot_plant) # see summary output for T50 values (note, just means)
+
+autoplot(TTHot_plant) # plots logistic curves and dashed lines for Tcrit, T50, T95
+
+
+```
+
+## Cleaning T50 estimate
+
+```{r}
+#| label: cleaning-T50-estimate
+#| warning: false
+
+## March
+# no results : BUI and MAT (--> removed)
+
+TTHot_plant_sum_2 <- TTHot_plant_sum |> 
+  filter(
+    !is.nan(prop_success) & prop_success >= 0.5,
+         )
+## a expliquer et sourcer
+
+
+# extraction de la liste des id qu'on garde pour après 
+list_ids <- TTHot_plant_sum_2$id
+
+#resultats filtrés qu'on garde
+filtered_results_TTHot_plant <- TTHot_plant$results[list_ids]
+```
+
+```{r}
+#| label: saving-hot-T50-estimate
+```
+
+## Plot
+
+```{r}
+#| label: T50-plots-per-plant
+#| warning: false
+
+summarise_htol_plant <- function(res, id) {
+
+  # si c'est null on met des NA pour que ça ne bloque pas
+  if (is.null(res)) {
+    return(data.frame(
+      id = id,
+      metric = c("T50", "T95", "Tcrit"),
+      estimate = NA,
+      se = NA,
+      lower = NA,
+      upper = NA
+    ))
+  }
+
+  # sinon on calucule normalement
+  data.frame(
+    id = id,
+    metric = c("T50", "T95", "Tcrit"),
+    estimate = c(median(res$T50, na.rm = TRUE),
+                 median(res$T95, na.rm = TRUE),
+                 median(res$Tcrit, na.rm = TRUE)),
+    se = c(sd(res$T50, na.rm = TRUE),
+           sd(res$T95, na.rm = TRUE),
+           sd(res$Tcrit, na.rm = TRUE)),
+    lower = c(quantile(res$T50, 0.025, na.rm = TRUE),
+              quantile(res$T95, 0.025, na.rm = TRUE),
+              quantile(res$Tcrit, 0.025, na.rm = TRUE)),
+    upper = c(quantile(res$T50, 0.975, na.rm = TRUE),
+              quantile(res$T95, 0.975, na.rm = TRUE),
+              quantile(res$Tcrit, 0.975, na.rm = TRUE))
+  )
+}
+
+# Run the summarize function for each ID output
+TTHot_plant_out <- Map(
+  summarise_htol_plant, # function
+  TTHot_plant$results, # extract the results part of the psiiht output
+  names(TTHot_plant$results)  # extract the ID from the psiiht output
+  )
+
+# # Run the summarize function for each ID output
+# TTHot_plant_out <- Map(
+#   summarise_htol_plant, # function
+#   filtered_results_TTHot_plant, # extract the results part of the psiiht output
+#   names(filtered_results_TTHot_plant) # extract the ID from the psiiht output
+# )
+
+# Create the dataframe by rowbinding
+TTHot_thermal_plant <- do.call(rbind, TTHot_plant_out)
+
+# String split back to columns the ID
+TTHot_wide_plant <- TTHot_thermal_plant |>
+  separate_wider_delim(
+    cols = id, # the column to split
+    delim = "_", # how is the column seperated
+    # what should the new columns be called - do in order
+    names = c("site_name", "species", "age_class", "plant_nr", "month", "leaf_age", "proj_2025") #,
+   # too_many = "merge", # Merges any extra parts into the last column
+   # too_few = "align_start" # Fills missing values with NA
+  ) |>
+  # Check the data type of the new output columns and convert if necessary
+   mutate(
+    age_class = factor(age_class),
+    proj_2025 = factor(proj_2025),
+    site_name = factor(site_name),
+    month = factor(month),
+    leaf_age = factor(leaf_age),
+    species = factor(species),
+    plant_nr = factor(plant_nr)
+  ) |>
+  # Relevel factors in natural order
+  mutate(
+    age_class = factor(age_class, levels = c("Newly Burnt","Pioneer", "Building", "Mature")))
+
+# Create a preliminary plot focusing on T50 metric
+TTHot_wide_plant |>
+  filter(metric == "T50") |>
+ggplot(aes(x = age_class,
+           y = estimate,
+           color = plant_nr)) +
+  geom_point(size = 2,
+              position = position_dodge(width = 0.6)) +
+  geom_errorbar(aes(ymin = estimate - se, ymax = estimate + se),
+                width = 0.2,
+                position = position_dodge(width = 0.6)) +
+  facet_grid(month ~ leaf_age) +
+  labs(
+    x = "Age class",
+    y = "T50 (°C)",
+    color = "Plant number",
+    title = bquote("Heat tolerance ("*T[50]*") of" ~ italic("Calluna vulgaris") ~ "across different age classes and seasons"),
+    subtitle = "Points represent bootstrap means; bars show ±1 SE"
+  ) +
+ stat_summary(
+  aes(group = age_class),
+  fun.data = function(y) {
+    data.frame(y = 30, label = paste0("n = ", length(y)))
+  },
+  geom = "text",
+  color = "grey40",
+  size = 3.2,
+  vjust = 0
+  ) +
+  theme_bw()
+
+```
+
+# Cold T50 curves
+
+```{r}
+#| label: Create-cold-data-frame
+# Create table with four columns
+therm_ctol <- data |>
+  # filter(!(month == "March" &
+  #            age_class %in% c("Mature", "Building"))) |>  # We did not keep MAT and BUI in March because they were mainly initially dead (based on the Fv/Fm graph). Consequently, we could not obtain a T50 curve or a T50 estimation for those age classes.
+  filter(proj_2025 == "TT Cold") |>
+  select(
+    month,
+    site_name,
+    species,
+    age_class,
+    leaf_age,
+    proj_2025,
+    plant_nr,
+    temp_exp,
+    fv_fm_final
+  )
+```
+
+```{r}
+#| label: concatenated-columns-per-plant
+
+united_columns_cold_plant <- unite(
+  therm_ctol,
+  col = "new_id",
+  site_name,
+  species,
+  age_class,
+  plant_nr,
+  month,
+  leaf_age,
+  proj_2025,
+  sep = "_",
+  remove = TRUE
+) |>
+  na.omit()
+
+# Convert the temperature values into numeric format to prevent formatting errors
+united_columns_cold_plant$temp_num <- as.numeric(as.character(united_columns_cold_plant$temp_exp))
+
+# Invert the temperature scale (-5, 0, 5, 10, 15, 20) to create a descending curve, ensuring the psiiht function can properly fit the model
+united_columns_cold_plant$temp_exp_order <- united_columns_cold_plant$temp_num * -1
+```
+
+## Removing plants 
+
+```{r}
+#| label:  plants-removed-from-cold-T50-estimate
+## Plants that crashed the script to estimate T50
+
+removed <- united_columns_cold_plant |>
+  filter(
+    new_id %in% c(
+      "Lygra_Calluna vulgaris_Newly Burnt_3_March_old_TT Cold"
+    )
+  )
+
+removed |>
+  mutate(temp_exp = as.numeric(as.character(temp_exp)),
+         fv_fm_final = as.numeric(as.character(fv_fm_final))) |>
+  mutate(temp_exp = factor(temp_exp, levels = c("5", "0", "-5", "-10","-15", "-20"))) |> 
+  ggplot(aes(x = temp_exp, y = fv_fm_final, color = new_id, group = new_id)) +
+  facet_grid(new_id ~ .) +
+  geom_line()
+```
+
+## Curves
+
+```{r}
+#| label: T50-cold-curves-per-plant
+#| warning: false
+
+# install.packages("remotes")
+# remotes::install_github("richardjtelford/thermalTolerance")
+library(thermalTolerance)
+
+library(future)
+plan(sequential)
+plan(multisession) # activate parallel processing
+set.seed(19) # avoir la même chose a chaque fois comme ça il n'y a pas des moments où ça marche et d'autres non  
+
+
+TTCold_plant <- psiiht(temperature = as.numeric(as.character(united_columns_cold_plant$temp_exp_order)), 
+               warming = FALSE, # cold treatment
+               fvfm = as.numeric(as.character(united_columns_cold_plant$fv_fm_final)),
+               control_temp = 5,
+               id = united_columns_cold_plant$new_id,
+               boots = 1000)# put 1000
+
+TTCold_plant_sum <- summary(TTCold_plant) # see summary output for T50 values (note, just means)
+
+autoplot(TTCold_plant) # plots logistic curves and dashed lines for Tcrit, T50, T95
+# /!\ the plots are the other way around regarding the temperatures.
+
+## March
+# crash the model : NB 3 old (no Tcrit) --> removed
+# no results (no curves) : a lot of them 
+
+```
+
+## Cleaning T50 estimate
+
+```{r}
+
+```
+
+```{r}
+#| label: saving-hot-T50-estimate
+```
+
+## Plot
+
+```{r}
+#| label: Cold-T50-plots-per-plant
+#| warning: false
+
+summarise_ctol_plant <- function(res, id) {
+  
+  if (is.null(res)) {
+    return(data.frame(
+      id = id,
+      metric = c("T50", "T95", "Tcrit"),
+      estimate = NA,
+      se = NA,
+      lower = NA,
+      upper = NA
+    ))
+  } 
+
+  data.frame(
+    id = id,
+    metric = c("T50", "T95", "Tcrit"),
+    estimate = c(median(res$T50, na.rm = TRUE),
+                 median(res$T95, na.rm = TRUE),
+                 median(res$Tcrit, na.rm = TRUE)),
+    se = c(sd(res$T50, na.rm = TRUE),
+           sd(res$T95, na.rm = TRUE),
+           sd(res$Tcrit, na.rm = TRUE)),
+    lower = c(quantile(res$T50, 0.025, na.rm = TRUE),
+              quantile(res$T95, 0.025, na.rm = TRUE),
+              quantile(res$Tcrit, 0.025, na.rm = TRUE)),
+    upper = c(quantile(res$T50, 0.975, na.rm = TRUE),
+              quantile(res$T95, 0.975, na.rm = TRUE),
+              quantile(res$Tcrit, 0.975, na.rm = TRUE))
+  )
+}
+
+
+# Run the summarize function for each ID output
+TTCold_plant_out <- Map(
+  summarise_ctol_plant, # function
+  TTCold_plant$results, # extract the results part of the psiiht output
+  names(TTCold_plant$results)  # extract the ID from the psiiht output
+  )
+
+# Create the dataframe by rowbinding
+TTCold_thermal_plant <- do.call(rbind, TTCold_plant_out)
+
+# Convert back to real cold temperature (°C), we multiply by -1 to reverse the model's trick and get true negative values.
+TTCold_thermal_plant <- TTCold_thermal_plant |>
+  mutate(
+    estimate = estimate * -1,
+    lower    = lower * -1,
+    upper    = upper * -1,
+    se       = abs(se) # Standard error stays positive as it measures variance
+  )
+
+# String split back to columns the ID
+TTCold_wide_plant <- TTCold_thermal_plant |>
+  separate_wider_delim(
+    cols = id, # the column to split
+    delim = "_", # how is the column seperated
+    # what should the new columns be called - do in order
+    names = c("site_name", "species", "age_class", "plant_nr", "month", "leaf_age", "proj_2025") #,
+   # too_many = "merge", # Merges any extra parts into the last column
+   # too_few = "align_start" # Fills missing values with NA
+  ) |> 
+  # Check the data type of the new output columns and convert if necessary
+   mutate(
+    age_class = factor(age_class),
+    proj_2025 = factor(proj_2025),
+    site_name = factor(site_name),
+    month = factor(month),
+    leaf_age = factor(leaf_age),
+    species = factor(species),
+    plant_nr = factor(plant_nr)
+  ) |> 
+  # Relevel factors in natural order
+  mutate(
+    age_class = factor(age_class, levels = c("Newly Burnt","Pioneer", "Building", "Mature")))
+
+# Create a preliminary plot focusing on T50 metric
+TTCold_wide_plant |> 
+  filter(metric == "T50") |> 
+ggplot(aes(x = age_class,
+           y = estimate,
+           color = plant_nr)) +
+  geom_point(size = 2,
+              position = position_dodge(width = 0.6)) +
+  geom_errorbar(aes(ymin = estimate - se, ymax = estimate + se),
+                width = 0.2,
+                position = position_dodge(width = 0.6)) +
+  facet_grid(month ~ leaf_age) +
+  labs(
+    x = "Age Class",
+    y = "T50 (°C)",
+    color = "plant number",
+    title = bquote("He tolerance ("*T[50]*") of" ~ italic("Calluna vulgaris") ~ "across different age classes and seasons"),
+    subtitle = "Points show mean bootstrap estimate; bars show ±1 SE"
+  ) +
+   stat_summary(
+  aes(group = age_class),
+  fun.data = function(y) {
+    data.frame(y = -48, label = paste0("n = ", length(y)))
+  },
+  geom = "text",
+  color = "grey40",
+  size = 3.2,
+  vjust = 0
+  ) +
+  theme_bw()
+```
+
+## 
