@@ -8,7 +8,7 @@ editor: visual
 # Import data
 
 ```{r}
-
+TTHot_wide_plant <- read.csv2("C:/Users/poula/Documents/M2_PAMEQ/Stage M2/Analyse statistique/thermotolerance/data/clean_data/TTHot_wide_plant.csv")
 ```
 
 # Effect of age classe, season and their interaction on T50
