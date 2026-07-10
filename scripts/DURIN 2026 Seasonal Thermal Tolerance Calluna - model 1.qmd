@@ -9,6 +9,7 @@ editor: visual
 
 ```{r}
 
+TTHot_wide_plant <- read.csv2("C:/Users/poula/Documents/M2_PAMEQ/Stage M2/Analyse statistique/thermotolerance/data/clean_data/TTHot_wide_plant.csv")
 ```
 
 ## Effect of leaf age on T50 (Hot tolerance)
