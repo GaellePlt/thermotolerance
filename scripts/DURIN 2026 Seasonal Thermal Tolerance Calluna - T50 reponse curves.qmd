@@ -5,12 +5,12 @@ format: html
 editor: visual
 ---
 
-# Import data 
+# Import data
 
 ```{r}
 #| label: importing-clean-data
 
-data <- read.csv("C:/Users/poula/Documents/M2_PAMEQ/Stage M2/Analyse statistique/thermotolerance/data/clean_data/Seasonal Calluna Thermal Tolerance and Plant Functional Traits.csv")
+data <- read.csv2("C:/Users/poula/Documents/M2_PAMEQ/Stage M2/Analyse statistique/thermotolerance/data/clean_data/Seasonal Calluna Thermal Tolerance and Plant Functional Traits.csv")
 ```
 
 # Hot T50 curves
@@ -153,6 +153,11 @@ filtered_results_TTHot_plant <- TTHot_plant$results[list_ids]
 
 ```{r}
 #| label: saving-hot-T50-estimate
+
+setwd("C:/Users/poula/Documents/M2_PAMEQ/Stage M2/Analyse statistique/thermotolerance/data/clean_data")
+
+write.csv2(TTHot_plant_sum, file = "TTHot_plant_sum.csv", row.names = FALSE)
+
 ```
 
 ## Plot
@@ -268,6 +273,15 @@ ggplot(aes(x = age_class,
 
 ```
 
+```{r}
+#| label: saving-hot-T50-data-frame
+
+setwd("C:/Users/poula/Documents/M2_PAMEQ/Stage M2/Analyse statistique/thermotolerance/data/clean_data")
+
+write.csv2(TTHot_wide_plant, file = "TTHot_wide_plant.csv", row.names = FALSE)
+
+```
+
 # Cold T50 curves
 
 ```{r}
@@ -315,7 +329,7 @@ united_columns_cold_plant$temp_num <- as.numeric(as.character(united_columns_col
 united_columns_cold_plant$temp_exp_order <- united_columns_cold_plant$temp_num * -1
 ```
 
-## Removing plants 
+## Removing plants
 
 ```{r}
 #| label:  plants-removed-from-cold-T50-estimate
