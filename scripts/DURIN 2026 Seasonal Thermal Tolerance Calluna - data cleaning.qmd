@@ -5,7 +5,7 @@ format: html
 editor: visual
 ---
 
-# Import Data
+# Library
 
 ```{r}
 #| label: loading-libraries
@@ -23,199 +23,97 @@ library(future) # Using severals cores at the same time
 library(ggcorrplot)
 library(emmeans)
 library(car) # for the Anova
+library(dplyr)
 ```
 
-## March data
+# Import Data
 
 ```{r}
-#| label: importing-raw-data-of-trait-and-fluorescence
-#| message: false 
+#| label: function-clean-trait-dataset-to-match-DURIN-formatting
 
-raw_data_mar <- read_excel(
-  "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/Analyse statistique/thermotolerance/data/raw_data/Seasonal Calluna Thermal Tolerance and Plant Functional Traits.xlsx", 
-  sheet = "cv_mar26", # Choose the sheet from excel
-  na = c("", "NA")) # NAs are actually imported as NAs, not as characters 
-```
+clean_sheet_data <- function(file_path, sheet_name) {
+  
+  # Importing raw data of trait and fluorescence
+  df <- read_excel(file_path, sheet = sheet_name, na = c("", "NA"))
+  
+  # Clean trait dataset to match DURIN formatting
+  df <- df |> 
+    # New name then old name of column, including snake case ('_' and lower letters)
+    rename(
+      site_name = siteID,
+      age_class = ageClass,
+      collection_time = CollTime,
+      paired_with = PairedWith,
+      temp_exp = TempExp,
+      temp_exp_time = TempExpTime,
+      temp_exp_time_unit = TempExpTimeUnit,
+      fv_fm_initial = 'Fv/Fm_Initial',
+      fv_fm_hr = 'Fv/Fm_Hr',
+      fv_fm_final = 'Fv/Fm_Final',
+      height_flower = 'height(s)_flower',
+      height_vegetative = 'height(s)_top',
+      treatment_date = TreatmentDate,
+      treatment_time = TreatmentTime
+    ) |> 
+    # using slice() to remove the first three row of example data (ALWAYS CHECK!)
+    slice(-(1:3)) |> 
+    
+    # Changing classes of all variables that should be in class factor
+    mutate(across(c(
+      site_name, species, proj_2025, project, age_class, plant_nr, leaf_age, 
+      sample, paired_with, calluna_shoot_type, temp_exp, temp_exp_time, 
+      temp_exp_time_unit, fv_fm_hr, scanned
+    ), as.factor)) |> 
+    
+    # Changing classes of variables that should be in class dbl/numeric
+    # (suppressWarnings évite le message 'NAs introduits lors de la conversion')
+    mutate(across(c(
+      fv_fm_initial, fv_fm_final, wet_mass_g, leaf_thickness_1_mm, 
+      leaf_thickness_2_mm, leaf_thickness_3_mm, dry_mass_g, height_flower, height_vegetative
+    ), ~ suppressWarnings(as.numeric(.)))) |> 
+    
+    # Changing classes of all variables that should be in class integers
+    mutate(across(c(bulk_nr_leaves, leaf_nr), ~ suppressWarnings(as.integer(.)))) |> 
+    
+    # Order relevant variables (useful for plotting and order based analyses)
+    # age_class sorted from youngest to oldest
+    mutate(age_class = factor(age_class, levels = c("Newly Burnt", "Pioneer", "Building", "Mature"))) |> 
+    
+    # Extraction sécurisée de l'heure et création de la date
+    mutate(
+      time_clean = format(parse_date_time(collection_time, orders = c("HMS", "HM", "Ymd HMS")), "%H:%M"),
+      date = ymd_hm(paste(year, month, day, time_clean)), 
+      .after = 1
+    ) |> 
+    select(-c(day, year, collection_time, time_clean)) |> 
+    
+    # Create a unique plant_ID given age_class, month, and plant_nr
+    mutate(unique_plantID = paste(age_class, month, plant_nr, sep = "_"))
+  
+  # Correction spécifique au code barre si la colonne existe
+  if ("envelope_ID" %in% names(df)) {
+    df <- df |> 
+      mutate(envelope_ID = case_when(
+        grepl("ADDX1933", envelope_ID) ~ "ADX1933",
+        grepl("AGS", envelope_ID) ~ "AGS4838",
+        TRUE ~ envelope_ID
+      ))
+  }
+  
+  return(df)
+}
 
-```{r}
-#| label: clean-trait-dataset-to-match-DURIN-formatting
-
-
-# Change some column names to snake_case standard
-# Change any column names to match DURIN standards - some outlined here (https://github.com/Durin-project/Durin_data)
-# Some information will be specific to traits, fluorescence etc.
-# using slice() to remove the first three row of example data (ALWAYS CHECK!)
-
-raw_data_mar <- raw_data_mar |> 
-  # New name then old name of column, including snake case ('_' and lower letters)
-  rename(site_name = siteID,
-         age_class = ageClass,
-         collection_time = CollTime,
-         paired_with = PairedWith,
-         temp_exp = TempExp,
-         temp_exp_time = TempExpTime,
-         temp_exp_time_unit = TempExpTimeUnit,
-         fv_fm_initial = 'Fv/Fm_Initial',
-         fv_fm_hr = 'Fv/Fm_Hr',
-         fv_fm_final = 'Fv/Fm_Final',
-         height_flower = 'height(s)_flower',
-         height_vegetative = 'height(s)_top',
-         treatment_date = TreatmentDate,
-         treatment_time = TreatmentTime) |>  
-  slice(-(1:3)) # Remove first three rows (excluding headers)
-
-
-# Check variable types (character, numeric etc)
-glimpse(raw_data_mar)
-
-# Changing classes of all variables that should be in class factor
-raw_data_mar <- raw_data_mar |>  
-  mutate(across(c(site_name, species, proj_2025, project, age_class, plant_nr, leaf_age, sample, paired_with, calluna_shoot_type, temp_exp, temp_exp_time, temp_exp_time_unit, fv_fm_hr, scanned), as.factor))
-
-
-# Changing classes of variables that should be in class dbl/numeric
-raw_data_mar <- raw_data_mar |>
-    mutate(across(c(fv_fm_initial, fv_fm_final, wet_mass_g, leaf_thickness_1_mm, leaf_thickness_2_mm, leaf_thickness_3_mm, dry_mass_g, height_flower, height_vegetative), as.numeric))
-
-# Changing classes of all variables that should be in class integers
-raw_data_mar <- raw_data_mar |>
-    mutate(across(c(bulk_nr_leaves, leaf_nr), as.integer))
-
-# Recheck data types again
-glimpse(raw_data_mar) 
-
-
-# Order relevant variables (useful for plotting and order based analyses)
-# age_class sorted from youngest to oldest
-
-raw_data_mar$age_class <- factor((raw_data_mar$age_class),
-                         levels = c("Newly Burnt", "Pioneer", 
-                                    "Building", "Mature"))
-# Check if changed successfully
-levels(raw_data_mar$age_class)
-
-
-# Converting day, month, year column into one column on the format yyyy_mm_dd
-# Convert collection time into proeper time format
-# removing the day and year columns, keep month for data cleaning checking for now
-
-raw_data_mar <- raw_data_mar |> 
-  mutate(date  = ymd_hm(paste(year, month, day,
-                 format(collection_time, format = "%H:%M"))), .after = 1)  |> 
-  select(-c(day, year, collection_time)) 
-
-
-glimpse(raw_data_mar) 
-
-# Create a unique plant_ID given age_class, month, and plant_nr
-raw_data_mar <- raw_data_mar |>   # assuming you already created Month/date_day earlier
-  mutate(
-    unique_plantID = paste(age_class, month, plant_nr, sep = "_")
-  ) |> 
-  mutate(envelope_ID = case_when(
-    grepl("ADDX1933", envelope_ID) ~ "ADX1933",
-    grepl("AGS", envelope_ID) ~ "AGS4838",
-    TRUE ~ envelope_ID  # keeps all the other remarks the way they were
-    ))#wrong barcode written
-```
-
-## May data
-
-```{r}
-#| label: importing-raw-data-of-trait-and-fluorescence
-#| message: false 
-
-raw_data_may <- read_excel(
-  "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/Analyse statistique/thermotolerance/data/raw_data/Seasonal Calluna Thermal Tolerance and Plant Functional Traits.xlsx", 
-  sheet = "cv_may26", # Choose the sheet from excel
-  na = c("", "NA")) # NAs are actually imported as NAs, not as characters 
-```
-
-```{r}
-#| label: clean-trait-dataset-to-match-DURIN-formatting
-
-
-# Change some column names to snake_case standard
-# Change any column names to match DURIN standards - some outlined here (https://github.com/Durin-project/Durin_data)
-# Some information will be specific to traits, fluorescence etc.
-# using slice() to remove the first three row of example data (ALWAYS CHECK!)
-
-raw_data_may <- raw_data_may |> 
-  # New name then old name of column, including snake case ('_' and lower letters)
-  rename(site_name = siteID,
-         age_class = ageClass,
-         collection_time = CollTime,
-         paired_with = PairedWith,
-         temp_exp = TempExp,
-         temp_exp_time = TempExpTime,
-         temp_exp_time_unit = TempExpTimeUnit,
-         fv_fm_initial = 'Fv/Fm_Initial',
-         fv_fm_hr = 'Fv/Fm_Hr',
-         fv_fm_final = 'Fv/Fm_Final',
-         height_flower = 'height(s)_flower',
-         height_vegetative = 'height(s)_top',
-         treatment_date = TreatmentDate,
-         treatment_time = TreatmentTime) |>  
-  slice(-(1:3)) # Remove first three rows (excluding headers)
-
-
-# Check variable types (character, numeric etc)
-glimpse(raw_data_may)
-
-# Changing classes of all variables that should be in class factor
-raw_data_may <- raw_data_may |>  
-  mutate(across(c(site_name, species, proj_2025, project, age_class, plant_nr, leaf_age, sample, paired_with, calluna_shoot_type, temp_exp, temp_exp_time, temp_exp_time_unit, fv_fm_hr, scanned), as.factor))
-
-
-# Changing classes of variables that should be in class dbl/numeric
-raw_data_may <- raw_data_may |>
-    mutate(across(c(fv_fm_initial, fv_fm_final, wet_mass_g, leaf_thickness_1_mm, leaf_thickness_2_mm, leaf_thickness_3_mm, dry_mass_g, height_flower, height_vegetative), as.numeric))
-
-# Changing classes of all variables that should be in class integers
-raw_data_may <- raw_data_may |>
-    mutate(across(c(bulk_nr_leaves, leaf_nr), as.integer))
-
-# Recheck data types again
-glimpse(raw_data_may) 
-
-
-# Order relevant variables (useful for plotting and order based analyses)
-# age_class sorted from youngest to oldest
-
-raw_data_may$age_class <- factor((raw_data_may$age_class),
-                         levels = c("Newly Burnt", "Pioneer", 
-                                    "Building", "Mature"))
-# Check if changed successfully
-levels(raw_data_may$age_class)
-
-
-# Converting day, month, year column into one column on the format yyyy_mm_dd
-# Convert collection time into proeper time format
-# removing the day and year columns, keep month for data cleaning checking for now
-
-raw_data_may <- raw_data_may |> 
-  mutate(date  = ymd_hm(paste(year, month, day,
-                 format(collection_time, format = "%H:%M"))), .after = 1)  |>  
-  select(-c(day, year, collection_time)) 
-
-
-glimpse(raw_data_may) 
-
-# Create a unique plant_ID given age_class, month, and plant_nr
-raw_data_may <- raw_data_may |>    # assuming you already created Month/date_day earlier
-  mutate(
-    unique_plantID = paste(age_class, month, plant_nr, sep = "_")
-    )
-```
-
-## July data
-
-```{r}
 
 ```
 
 ```{r}
+#| label: clean-trait-dataset-to-match-DURIN-formatting-function
 
+path <- "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/Analyse statistique/thermotolerance/data/raw_data/Seasonal Calluna Thermal Tolerance and Plant Functional Traits.xlsx"
+
+raw_data_mar  <- clean_sheet_data(path, sheet_name = "cv_mar26")
+raw_data_may  <- clean_sheet_data(path, sheet_name = "cv_may26")
+raw_data_july <- clean_sheet_data(path, sheet_name = "cv_july26")
 ```
 
 ## Merge month dataset
@@ -223,7 +121,7 @@ raw_data_may <- raw_data_may |>    # assuming you already created Month/date_day
 ```{r}
 #| label: Merge-March-date-frame-and-May-data-frame
 
-raw_data <- bind_rows(raw_data_mar, raw_data_may)
+raw_data <- bind_rows(raw_data_mar, raw_data_may, raw_data_july)
 ```
 
 ## Leaf area dataset
@@ -300,39 +198,62 @@ Above was cleaning of column names, formatting of variables etc. Now we need to 
 ## first observation : some REMARKS are the same but with capital letters for example
 
 data <- data |> 
-  mutate(remark = tolower(remark)) |>  #evrything is in small letter to remove all capital letter mistakes
- 
-   mutate(
-    scanning = str_extract(remark, "[^;]*brown[^;]*") |> 
-      str_trim()
-  ) |>  # /!\ /!\
-  
-  mutate(scanning = case_when(        
-    month == "March" & proj_2025 == "Traits" & age_class == "Building" & plant_nr == "1" & leaf_nr == "20" ~  "mostly brown leaves",
-    month == "March" & proj_2025 == "Traits" & age_class == "Building" & plant_nr == "6" & leaf_nr == "18" ~ "brown leaves",
-    month == "March" & proj_2025 == "Traits" & age_class == "Newly Burnt" & plant_nr == "7" ~ "partly brown leaves",
-    month == "March" & proj_2025 == "Traits" & age_class == "Building" & plant_nr == "8" ~ "brown leaves",
-    TRUE ~ scanning  # keeps all the other remarks the way they were
-    )) |> 
-  
-  mutate (remark = case_when(
-    grepl("water", remark) ~ "liquid water in bag",
-    grepl("fridge", remark) ~ "not removed from fridge, no balls",
-    # grepl("only", remark) ~ "3 leaves at scanning; mostly brown leaves; 3 leaves at thickness", # /!\ /!\
-     grepl("harvested", remark) ~ "no leaf harvested",
-    TRUE ~ remark  # keeps all the other remarks the way they were
-  )) |> 
-  mutate(remark = case_when(
-    grepl("3 leaves at scanning ; 3 leaves at thickness ; 3 leaves at dry mass", remark) ~ "3 leaves at scanning; 3 leaves at thickness; 3 leaves at dry mass",
-    grepl("brown leaves ; 3 leaves at wet mass ; 3 leaves at thickness ; 3 leaves at dry mass", remark) ~ "brown leaves; 3 leaves at wet mass; 3 leaves at thickness; 3 leaves at dry mass",
-    grepl("brown leaves ; 5 leaves at scanning ; 5 leaves at thickness ; 5 leaves at dry mass", remark) ~ "brown leaves; 5 leaves at scanning; 5 leaves at thickness; 5 leaves at dry mass",
-    grepl("5 leaves at scanning might be one leaf in 2 pieces ; 5 leaves at thickness ; 5 leaves at dry mass", remark) ~ "5 leaves at scanning might be one leaf in 2 pieces; 5 leaves at thickness; 5 leaves at dry mass",
-    TRUE ~ remark
-  ))
+  mutate(
+    # 1. Basic cleaning: lowercasing & spacing around ';'
+    remark = tolower(remark),
+    remark = gsub("\\s*;\\s*", "; ", remark),
+    remark = str_trim(remark),
+    
+    # 2. Pattern-based substitutions (works even when multiple phrases are separated by ';')
+    remark = gsub("\\b[^;]*((leaf|leaves)[^;]*(sellotape|glue)|glue)[^;]*", "leaf stuck to tape", remark),
+    remark = gsub("only\\s+(3 leaves at scanning)", "\\1", remark),
+    
+    # Term-specific corrections (fluo, typos, etc.)
+    remark = gsub("\\bfluorescence\\b|\\bfluo\\b", "fv/fm", remark),
+    remark = gsub("\\bdyr mass\\b", "dry mass", remark),
+    remark = gsub("paper towel was a little dry", "paper towel was little dry", remark),
+    remark = gsub("no flowers\\b", "no flower", remark),
+    
+    # Append 'at fv/fm' to '3 leaves' or '4 small leaves' 
+    # (only if not already followed by 'at' or 'after')
+    remark = gsub("\\b(3 leaves|4 small leaves)\\b(?!\\s+(at|after))", "\\1 at fv/fm", remark, perl = TRUE),
+    
+    # Clean up trailing commas and trailing semicolons
+    remark = gsub(",\\s*", "; ", remark),
+    remark = gsub(";\\s*$", "", remark),
+
+    # 3. Extract fragment containing 'brown'
+    scanning = str_extract(remark, "[^;]*brown[^;]*") |> str_trim(),
+
+    # 4. Specific conditional corrections for 'scanning'
+    scanning = case_when(
+      month == "March" & proj_2025 == "Traits" & age_class == "Building"   & plant_nr == "1" & leaf_nr == "20" ~ "mostly brown leaves",
+      month == "March" & proj_2025 == "Traits" & age_class == "Building"   & plant_nr == "6" & leaf_nr == "18" ~ "brown leaves",
+      month == "March" & proj_2025 == "Traits" & age_class == "Newly Burnt" & plant_nr == "7"                  ~ "partly brown leaves",
+      month == "March" & proj_2025 == "Traits" & age_class == "Building"   & plant_nr == "8"                  ~ "brown leaves",
+      TRUE ~ scanning
+    ),
+
+    # 5. Global overrides (full cell replacements or specific full matches)
+    remark = case_when(
+      grepl("water", remark)     ~ "liquid water in bag",
+      grepl("fridge", remark)    ~ "not removed from fridge, no balls",
+      grepl("harvested", remark) ~ "no leaf harvested",
+      
+      # Specific element reordering
+      remark == "3 leaves at wet mass; 3 leaves at thickness; mostly brown leaves" ~ 
+        "3 leaves at scanning; mostly brown leaves; 3 leaves at thickness",
+        
+      # Specific note update with sample ID
+      remark == "wet mass only 4dp, 0.1069" ~ 
+        "wet mass only 4dp, 0.1069 for AUX097; value changed to 0.01069",
+        
+      TRUE ~ remark
+    )
+  )
 
 unique(data$remark)
 
-## NOT ENTIRELY DONE
 ```
 
 ```{r}
