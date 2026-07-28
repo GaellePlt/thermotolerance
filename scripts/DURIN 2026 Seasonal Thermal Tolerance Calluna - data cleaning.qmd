@@ -39,7 +39,7 @@ clean_sheet_data <- function(file_path, sheet_name) {
   # Clean trait dataset to match DURIN formatting
   df <- df |> 
     # New name then old name of column, including snake case ('_' and lower letters)
-    rename(
+    dplyr::rename(
       site_name = siteID,
       age_class = ageClass,
       collection_time = CollTime,
@@ -114,6 +114,8 @@ path <- "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/Analyse statistique/thermoto
 raw_data_mar  <- clean_sheet_data(path, sheet_name = "cv_mar26")
 raw_data_may  <- clean_sheet_data(path, sheet_name = "cv_may26")
 raw_data_july <- clean_sheet_data(path, sheet_name = "cv_july26")
+
+# NOTE: Fixes date parsing warning (line 684) — handled below in the 'adjusting-weird-values-in-the-data' section.
 ```
 
 ## Merge month dataset
@@ -122,6 +124,13 @@ raw_data_july <- clean_sheet_data(path, sheet_name = "cv_july26")
 #| label: Merge-March-date-frame-and-May-data-frame
 
 raw_data <- bind_rows(raw_data_mar, raw_data_may, raw_data_july)
+
+raw_data <- raw_data |> 
+  mutate(
+    month = factor(month, levels = c("March", "May", "July")),
+    age_class = factor(age_class, 
+                       levels = c("Newly Burnt", "Pioneer", "Building", "Mature"),)
+  )
 ```
 
 ## Leaf area dataset
@@ -199,16 +208,16 @@ Above was cleaning of column names, formatting of variables etc. Now we need to 
 
 data <- data |> 
   mutate(
-    # 1. Basic cleaning: lowercasing & spacing around ';'
+    # 1. Basic cleaning
     remark = tolower(remark),
     remark = gsub("\\s*;\\s*", "; ", remark),
     remark = str_trim(remark),
     
-    # 2. Pattern-based substitutions (works even when multiple phrases are separated by ';')
+    # 2. Pattern-based substitutions
     remark = gsub("\\b[^;]*((leaf|leaves)[^;]*(sellotape|glue)|glue)[^;]*", "leaf stuck to tape", remark),
     remark = gsub("only\\s+(3 leaves at scanning)", "\\1", remark),
     
-    # Term-specific corrections (fluo, typos, etc.)
+    # Term-specific corrections
     remark = gsub("\\bfluorescence\\b|\\bfluo\\b", "fv/fm", remark),
     remark = gsub("\\bdyr mass\\b", "dry mass", remark),
     remark = gsub("paper towel was a little dry", "paper towel was little dry", remark),
@@ -225,7 +234,7 @@ data <- data |>
     # 3. Extract fragment containing 'brown'
     scanning = str_extract(remark, "[^;]*brown[^;]*") |> str_trim(),
 
-    # 4. Specific conditional corrections for 'scanning'
+    # 4. Specific conditional corrections for scanning
     scanning = case_when(
       month == "March" & proj_2025 == "Traits" & age_class == "Building"   & plant_nr == "1" & leaf_nr == "20" ~ "mostly brown leaves",
       month == "March" & proj_2025 == "Traits" & age_class == "Building"   & plant_nr == "6" & leaf_nr == "18" ~ "brown leaves",
@@ -234,15 +243,16 @@ data <- data |>
       TRUE ~ scanning
     ),
 
-    # 5. Global overrides (full cell replacements or specific full matches)
+    # 5. Global overrides
     remark = case_when(
       grepl("water", remark)     ~ "liquid water in bag",
       grepl("fridge", remark)    ~ "not removed from fridge, no balls",
-      grepl("harvested", remark) ~ "no leaf harvested",
+      grepl("harvested", remark) & !grepl("harvested after 24h", remark) ~ "no leaf harvested",
       
       # Specific element reordering
       remark == "3 leaves at wet mass; 3 leaves at thickness; mostly brown leaves" ~ 
         "3 leaves at scanning; mostly brown leaves; 3 leaves at thickness",
+      envelope_ID == "APL2797" ~ "3 leaves at scanning; 2 leaves at thickness; 2 leaves at dry mass",
         
       # Specific note update with sample ID
       remark == "wet mass only 4dp, 0.1069" ~ 
@@ -257,21 +267,39 @@ unique(data$remark)
 ```
 
 ```{r}
-#| label: adjusting-bulk_nr-values-per-trait
+#| label: adjusting-scanned_bulk_nr
 
-# While the bulk number from the envelope represents the initial sample size, sometimes leaves are lost or gained during the trait sampling process. Need to check comments and the particple count from the leaf area scans to adjust the bulk number leaves for each trait. This needs to be done before calculating per leaf trait values, which can be used for metrics like SLA and LDMC.
+# While the bulk number from the envelope represents the initial sample size, sometimes leaves are lost or gained during the trait sampling process. Need to check the particule count from the leaf area scans to adjust the bulk number leaves. This needs to be done before calculating per leaf trait values, which can be used for metrics like SLA and LDMC.
 
-# Relies on cleaned remarks column from step above
+# BULK LEAF COUNT ADJUSTMENTS:
+# - Pre-processing (copies of original images): Artifacts (dust/leftover fragments) erased and stuck leaves separated using Paint prior to re-running ImageJ.
+# - Script-level fixes: Subtracts partial leaf fragments to reflect actual scanned leaf numbers per envelope.
+# - Validation: All non-standard bulk counts (!= 4) left unmodified were manually cross-checked.
 
-# Order of trait measurements is: fvfm_initial, wet_mass, leaf_area, leaf_thickness, dry_mass
+data <- data |>
+  mutate(
+    leaf_area_scanned_bulk_nr = case_when(
+      # March
+      # Partial leaf fragment; unknown parent leaf
+      envelope_ID %in% c("ABW4300", "ABX8228", "ABY3458", "AES5198", "AEY6133","AFD4235", "AFE4708", "AFF6622", "AFG3152", "AFH2775", "DNH5015", "DOF6452", "ACL6886", "ACW2990", "ADC7047", "ADS2507", "AGR6304") ~ 4,
+   
+      # May
+      # Partial leaf fragment; unknown parent leaf
+      envelope_ID %in% c("AIR6318", "AMI3269", "ANP7023", "AQI1129", "AQT4821") ~ 4,
 
-data <- data |> 
-  mutate (remark = case_when(
-    grepl("APL2797", envelope_ID) ~ "3 leaves at scanning ; 2 leaves at thickness ; 2 leaves at dry mass"
-  ))
+      # July
+      # Partial leaf fragment; unknown parent leaf
+      envelope_ID %in% c("AUL1455", "BAX3476", "BAY7128", "BBZ0443", "BCA1604") ~ 4,
+      
+      # Partial leaf fragment; known parent leaf
+      envelope_ID == "BCH3466" ~ 4,
+      
+      TRUE ~ leaf_area_scanned_bulk_nr
+    )
+  )
 
-unique(data$remark)
-  
+
+
 ```
 
 ```{r}
@@ -284,7 +312,7 @@ data <- data |>
     TRUE ~ leaf_thickness_3_mm
   )) |>   #BUI 8 : 0.588 in data frame ; 0.249 on the envelope AGT0463
   mutate(month = case_when(
-    ymd_hms(date) == ymd_hms("2026-01-10 08:00:00") & month == "January" ~ "March",
+    ymd_hms(date) == ymd_hms("2026-01-10 08:00:00") ~ "March",
     TRUE ~ month
   )) |>  #wrong month for PIO1 - leaf15
   mutate(date = case_when(
@@ -300,6 +328,7 @@ data <- data |>
 ## May 
 data <- data |> 
 ## wet mass
+  filter(envelope_ID != "AJD4636" | is.na(envelope_ID))|>  #NB 4 : 0.05708 in data frame ; 0.05708 on the envelope AJD4636 and 4 leaves on the scanns. Excluded sample: presence of non-target branching leaf causing artificially high wet mass.
   mutate(wet_mass_g = case_when(
     grepl("AUX0977", envelope_ID) ~ 0.01069,
     TRUE ~ wet_mass_g
@@ -317,15 +346,42 @@ data <- data |>
     month == "March" & proj_2025 == "TT Hot" & age_class == "Pioneer" & plant_nr == "6" & leaf_age == "old" & temp_exp == 38 & fv_fm_final == 0.12 ~ "May",
     month == "March" & proj_2025 == "TT Hot" & age_class == "Pioneer" & plant_nr == "6" & leaf_age == "young" & temp_exp == 38 & fv_fm_final == 0.69 ~ "May",
     TRUE ~ month
-  ))
+  )) |> 
+  mutate(date = case_when(
+    is.na(date) | date %in% c("na", "NA") ~ "2026-05-19 08:11:00",
+    TRUE ~ as.character(date)
+  )) |> 
+  mutate(date = ymd_hms(date)) |> 
+#LDMC
+  filter(envelope_ID != "APL2797" | is.na(envelope_ID)) |> # BUI 2 (APL2797) : 1.720, too high. 4 leaves at wet mass (0.0043/leaf) and 2 leaves at dry mass (0.00074).Excluded sample.
+# NB 8 young excluded sample for traits: presence of non-target branching leaf causing artificially high measure. For fv:fm, no branching leaf, kept in the data.
+  filter(
+    !(month %in% "May" & 
+      proj_2025 %in% "Traits" & 
+      age_class %in% "Newly Burnt" & 
+      plant_nr %in% "8" & 
+      leaf_age %in% "young")
+  )
+
+
+## July 
+data <- data |> 
+## wet mass
+  mutate(wet_mass_g = case_when(
+    grepl("AWR0569", envelope_ID) ~ 0.01261,
+    TRUE ~ wet_mass_g
+  ))  #PIO 3 : 0.001261 in the data frame ; 0.01261 on envelope AWR0569
+#Excluded samples: BUI 1 and 2 were measured twice: immediately and after 24 hours du to the presence of non-target branching leave in the first measurement. A  difference is observed between the two time points, with the 24-hour measurements being more consistent with the other buildings. Consequently, only the 24-hour measurements for BUI 1 and 2 were retained in the dataset. --> done in the July Building 1 and 2 issue section.
 ```
 
 # Calculate values per leaf trait
 
 ```{r}
-#| label: calculate-bulk_nr-for-each-trait
+#| label: adjusting-bulk_nr-for-each-trait
 
-# Before checking for outliers, need to convert traits to 'per leaf' values, else outliers might simply reflect a shift in the leaf numbers for 'absolute' values.
+# While the bulk number from the envelope represents the initial sample size, sometimes leaves are lost or gained during the trait sampling process. Need to check comments and the particule count from the leaf area scans to adjust the bulk number leaves for each trait. This needs to be done before calculating per leaf trait values, which can be used for metrics like SLA and LDMC.
+
+# Relies on cleaned remarks column from step above
 
 # Note, this is only for wet mass, leaf area, dry mass.
 # For fluorescence this is per sample in the clip
@@ -341,17 +397,20 @@ data$bulk_nr_wet_mass <- data$bulk_nr_leaves
 data <- data |> 
   mutate(bulk_nr_wet_mass = case_when(
     grepl("3 leaves at wet mass", remark) ~ 3,
+    grepl("2 leaves at wet mass", remark) ~ 2,
+    grepl("5 leaves at wet mass", remark) ~ 5,
     .default = bulk_nr_wet_mass    # Keep original bulk nr value if no comment is applied to row
   ))
 
 # Create leaf area, rename the particle counts from scanner. More accurate then comments for values less than 4. However, sometimes leaves break into multiple parts, so the particle count may be higher than the leaf count artificially.
 data <- data |> 
-  rename(bulk_nr_leaf_area = leaf_area_scanned_bulk_nr)
+  dplyr::rename(bulk_nr_leaf_area = leaf_area_scanned_bulk_nr)
 
 # Modify based on the wet mass comments
 data <- data |> 
   mutate(bulk_nr_leaf_area = case_when(
     # Checked against images, indeed 5 leaves (not broken)
+    grepl("2 leaves at scanning", remark) ~ 2,
     grepl("5 leaves at scanning", remark) ~ 5,
     grepl("3 leaves at scanning", remark) ~ 3,
     .default = bulk_nr_leaf_area    # Keep original bulk nr value if no comment is applied to row
@@ -367,25 +426,16 @@ bulk_nr_issues <- data |>
   filter(bulk_nr_leaf_area > bulk_nr_wet_mass) |> 
   select(envelope_ID, remark, bulk_nr_leaves, bulk_nr_wet_mass, bulk_nr_leaf_area)
 
-
-# Address each outcome by envelope_ID
-# AEI1422 actually has 5 leaves- see comment edit above
-# ADM0437 actually has 5 leaves - see comment edit above
 # All other envelopes have correct number based on the wet mass column in the images, so correct back to the wet mass values
-
 
 # Modify based on the comments, checking images etc. 
 data <- data |> 
   mutate(bulk_nr_leaf_area = case_when(
-    # Envelope ID's are X, then do Y
-    grepl("AEI1422", envelope_ID) ~ 5,
-    grepl("ADM0437", envelope_ID) ~ 5,    
+    grepl("2 leaves at scanning", remark) ~ 2,
     grepl("5 leaves at scanning", remark) ~ 5,
     grepl("3 leaves at scanning", remark) ~ 3,
     .default = bulk_nr_wet_mass    # Keep original bulk nr value if no comment is applied to row
   ))
-
-
 
 
 # Note, for thickness the value is note correct by bulk leaf number, however, if there are fewer than three leaves, there may only be one or two leaf thickness measurements to average across. 
@@ -395,11 +445,11 @@ data$bulk_nr_thickness <- data$bulk_nr_leaf_area
 bulk_nr_issues_thickness <-  data |> 
   filter(rowSums(across(starts_with("leaf_thickness_"), ~ . > 0)) < 3)
 
-# No issues!
 
 # Modify based on the thickness comments
 data <- data |> 
   mutate(bulk_nr_thickness = case_when(
+    grepl("2 leaves at thickness", remark) ~ 2,
     grepl("3 leaves at thickness", remark) ~ 3,
     grepl("5 leaves at thickness", remark) ~ 5,
     .default = bulk_nr_thickness    # Keep original bulk nr value if no comment is applied to row
@@ -412,6 +462,7 @@ data$bulk_nr_dry_mass <- data$bulk_nr_thickness
 # Modify based on the dry mass comments
 data <- data |> 
   mutate(bulk_nr_dry_mass = case_when(
+    grepl("2 leaves at dry mass", remark) ~ 2,
     grepl("3 leaves at dry mass", remark) ~ 3,
     grepl("5 leaves at dry mass", remark) ~ 5,
     .default = bulk_nr_dry_mass    # Keep original bulk nr value if no comment is applied to row
@@ -501,7 +552,10 @@ ggplot(data |>
   
   theme_bw()
 
-## March : NB 7 without flowering height
+# NOTE: 
+# March: NB 7 without flowering height
+# July: no flowering height
+
 ```
 
 ```{r}
@@ -509,7 +563,8 @@ ggplot(data |>
 #| warning: false
 
 # making a scatterplot for wet mass mean for trait leaves, plant_nr on x-axis and weight in g on y-axis
-(data |>  
+
+data |>  
          filter(proj_2025 == "Traits") |> 
        ggplot(aes(x = factor(plant_nr), y = wet_mass, colour = factor(plant_nr))) +
   geom_point(size = 2, alpha = 0.8,
@@ -520,7 +575,9 @@ ggplot(data |>
     x = "Plant number",
     y = "Wet mass (g)",
     title = "Mean wet mass per leaf by plant, age class and month"
-  ))
+  )
+
+# If needed data modifications are documented in the adjusting-weird-values-in-the-data section.
 
 ## March
 # wet mass ok exept for :
@@ -529,9 +586,18 @@ ggplot(data |>
 
 ## May
 # wet mass ok except for :
-#           PIO 7 : 0.10690 in data frame ; 0.1069 on envelope AUX097--> pb with 5 decimal scale
+#           PIO 7 : 0.10690 in data frame ; 0.1069 on envelope AUX097 --> pb with 5 decimal scale
 #           MAT 2 : 0.14490 in data frame ; 0.01449 on the envelope APP8997
-#           NB 7 : 0.05708 in data frame ; 0.05708 on the envelope AJD4636
+#           NB 4 : 0.05708 in data frame ; 0.05708 on the envelope AJD4636 and 4 leaves on scann.Excluded sample: presence of non-target branching leaf causing artificially high wet mass.
+#           NB 8 young : 0.04181 in data frame ; 0.04181 on the envelope AMC1987 and 4 leaves on scann.
+#           NB 8 young : 0.03912 in data frame ; 0.03912 on the envelope AMD2883 and 4 leaves on scann.Excluded sample: presence of non-target branching leaf causing artificially high wet mass.
+#           NB 8 young : 0.05026 in data frame ; 0.05026 on the envelope AME1094 and 4 leaves on scann.Excluded sample: presence of non-target branching leaf causing artificially high wet mass.
+#           NB 8 young : 0.03936 in data frame ; 0.03936 on the envelope AMF9314 and 4 leaves on scann.Excluded sample: presence of non-target branching leaf causing artificially high wet mass.
+#           NB 8 young : Excluded sample: presence of non-target branching leaf causing artificially high wet mass.
+
+## July
+# wet mass ok except for :
+#           PIO 3 : 0.001261 in the data frame ; 0.01261 on envelope AWR0569
 ```
 
 ```{r}
@@ -579,7 +645,7 @@ ggplot(data |>  filter(proj_2025 == "Traits"),
   )
 
 # bigger leaves for NB and smaller for the others
-# for PIO : leaf area small edited image bigger than non edited one --> ?
+# for PIO : leaf area small edited image bigger than non edited one
 # small edited images seem often to be plant 5 to 8 and large one plante 1 to 4
 ```
 
@@ -623,11 +689,15 @@ ggplot(data_long_thickness, #plotting drom long format
     title = "Leaf thickness replicates by plant, age class and month"
   )
 
+# If needed data modifications are documented in the adjusting-weird-values-in-the-data section.
+
 ## March
 #         BUI 8 : 0.588 in data frame ; 0.249 on the envelope AGT0463
 
 ## May, high value for :
-#           NB 4 - 16 young : 0.857 (thickness 1) in the data frame ; 0.857 on the enveloppe AJA9484
+#         NB 4 - 16 young : 0.857 (thickness 1) in the data frame ; 0.857 on the enveloppe AJA9484
+#         NB 4 - 17 young : 0.778 (thickness 1) in the data frame ; 0.778 on the enveloppe AJB0231
+#         NB 4 - 18 young : 0.751 (thickness 1) in the data frame ; 0.751 on the enveloppe AJC0356
 ```
 
 ```{r}
@@ -647,11 +717,8 @@ ggplot(data |> filter(proj_2025 == "Traits"),
     title = "Mean dry mass per leaf by plant, age class and month"
   )
 
-# values seem ok ; may be PIO 5 values are a little bit higher than the others PIO
-# 2 low values for dry mass plant 6 for BUI and MAT
+# If needed data modifications are documented in the adjusting-weird-values-in-the-data section.
 
-## MAY, high value for :
-#               MAT 8 : 0.0590 in data frame ; 0.00590 on the enveloppe 
 ```
 
 ```{r}
@@ -724,7 +791,7 @@ ggplot(data |>  filter(proj_2025 == "Traits"),
 
 **Specific Leaf Area (SLA) :**
 
-SLA = Leaf Area (mm²) / Leaf dry mass (g)
+SLA = Leaf Area (cm²) / Leaf dry mass (g)
 
 High SLA (\> 300 000 mm²/g) means fast-growing plants ("Acquisitive strategy"). These plants have thin, flexible leaves that capture light efficiently.
 
@@ -747,7 +814,7 @@ data <- data |>
   mutate(
     SLA = ifelse(
       !is.na(leaf_area) & !is.na(dry_mass), # excluding rows with NAs
-      leaf_area / dry_mass, # Leaf level metrics
+      round(leaf_area / dry_mass, 3), # Leaf level metrics
       NA_real_
     )
   )
@@ -756,7 +823,7 @@ data <- data |>
   mutate(
     LDMC = ifelse( # making new ldmc column
       !is.na(dry_mass) & !is.na(wet_mass), # excluding rows with NAs
-      dry_mass / wet_mass, # Leaf level metrics
+      round(dry_mass / wet_mass, 5), # Leaf level metrics
       NA_real_
     )
   )
@@ -779,11 +846,18 @@ ggplot(data |>  filter(proj_2025 == "Traits"),
     title = "Mean SLA per leaf by plant, age class and month"
   )
 
+# If needed data modifications are documented in the adjusting-weird-values-in-the-data section.
+
 ## March
 # BUI 6 (ADM0437) : 450, high --> 5 leaves at scanning, 5 leaves at dry mass, envelope checked
 
 ## May
-# MAT 6 (ATQ5149) : 0.576 for SLA, envelope checked
+# BUI 7 (ANH0353) : 110, low --> 4 leaves at scanning, 2 leaves at dry mass, envelope checked
+# MAT 1 (ARA5864) : 567, high --> 4 leaves at scanning, 5 leaves at dry mass, envelope checked
+
+## July
+# NB 1 : high, checked
+# PIO 1 (AUL1455) :high, --> 3 leaves at scanning, 3 leaves at dry mass, envelope checked.
 ```
 
 ```{r}
@@ -803,13 +877,152 @@ ggplot(data |>  filter(proj_2025 == "Traits"),
     title = "Mean LDMC per leaf by plant, age class and month"
   )
 
+# If needed data modifications are documented in the adjusting-weird-values-in-the-data section.
 
 ## March
 # BUI 6 (ADM0437) : 0.265, low --> 5 leaves at dry mass, envelope checked
 # MAT 6 (AEI1422) : 0.335, low --> 5 leaves at dry mass, envelope checked 
 
 ## May
-# MAT 6 (ATQ5149) : 0.888, high, envelope checked
+# MAT 6 (ATQ5149) : 0.888, high, 4 leaves at wet mass and 4 leaves at dry mass, envelope checked
+# BUI 2 (APL2797) : 1.720, too high. 4 leaves at wet mass (0.0043/leaf) and 2 leaves at dry mass (0.00074).Excluded sample.
+
+```
+
+# July Building 1 and 2 issue
+
+The presence of a non-target branching leaf in BUI 1 and 2 during initial measurements led to artifactual trait discrepancies. Measurements were repeated 24 hours later to determine the appropriate dataset to retain.
+
+```{r}
+#| label: BUI-1-2-traits-check
+#| warning: false
+
+data |> 
+  filter(
+    month == "July",
+    age_class == "Building",
+    plant_nr %in% c("1", "2"),
+    proj_2025 == "Traits"
+  ) |> 
+  pivot_longer(
+    cols = c(LDMC, SLA, wet_mass, leaf_area, dry_mass),
+    names_to = "trait",
+    values_to = "value"
+  ) |> 
+  # Assign clean labels with units for each trait
+  mutate(
+    trait_label = case_when(
+      trait == "dry_mass"  ~ "Dry Mass (g)",
+      trait == "wet_mass"  ~ "Wet Mass (g)",
+      trait == "leaf_area" ~ "Leaf Area (cm²)",
+      trait == "LDMC"      ~ "LDMC (g/g)",
+      trait == "SLA"       ~ "SLA (cm²/g)",
+      TRUE ~ trait
+    )
+  ) |> 
+  ggplot(
+    aes(
+      x = factor(plant_nr), 
+      y = value, 
+      color = case_when(
+        grepl("harvested after 24h", remark) ~ "harvested after 24h",
+        TRUE ~ "harvested like usual"
+      )
+    )
+  ) +
+  geom_point(size = 2, alpha = 0.8, position = position_jitter(width = 0.15)) +
+  
+  # Facet using the newly formatted label
+  facet_wrap(~ trait_label, scales = "free_y") +
+  
+  scale_color_manual(
+    name = "Harvest status",
+    values = c(
+      "harvested after 24h" = "firebrick",
+      "harvested like usual" = "gray40"
+    )
+  ) +
+  theme_bw() +
+  labs(
+    x = "Plant number",
+    y = NULL, # Remove y-axis label since units are now in the panel headers
+    title = "Trait values per leaf by plant (July, Building)"
+  )
+```
+
+```{r}
+#| label: BUI-1-2-traits-check
+#| warning: false
+
+
+# 1. Prepare and transform the dataset
+data_prepared <- data |> 
+  filter(
+    month == "July",
+    age_class == "Building",
+    proj_2025 == "Traits"
+  ) |> 
+  pivot_longer(
+    cols = c(wet_mass, leaf_area, dry_mass, LDMC, SLA),
+    names_to = "trait",
+    values_to = "value"
+  ) |> 
+  mutate(
+    trait_label = case_when(
+      trait == "dry_mass"  ~ "Dry Mass (g)",
+      trait == "wet_mass"  ~ "Wet Mass (g)",
+      trait == "leaf_area" ~ "Leaf Area (cm²)",
+      trait == "LDMC"      ~ "LDMC (g/g)",
+      trait == "SLA"       ~ "SLA (cm²/g)",
+      TRUE ~ trait
+    ),
+    harvest_status = case_when(
+      grepl("harvested after 24h", remark) ~ "harvested after 24h",
+      TRUE ~ "harvested like usual"
+    )
+  )
+
+# 2. Loop over each unique trait_label and generate individual plots
+unique(data_prepared$trait_label) |> 
+  walk(function(t) {
+    p <- data_prepared |> 
+      filter(trait_label == t) |> 
+      ggplot(aes(x = factor(plant_nr), y = value, color = harvest_status)) +
+      
+      geom_point(size = 2.5, alpha = 0.8, position = position_jitter(width = 0.15)) +
+      
+      scale_color_manual(
+        name = "Harvest status",
+        values = c(
+          "harvested after 24h" = "firebrick",
+          "harvested like usual" = "gray40"
+        )
+      ) +
+      
+      theme_bw() +
+      labs(
+        x = "Plant number",
+        y = t,
+        title = paste("Trait values per leaf by plant (July, Building) -", t)
+      )
+    
+    print(p)
+  })
+
+# If needed data modifications are documented in the adjusting-weird-values-in-the-data section.
+
+#Excluded samples: BUI 1 and 2 were measured twice: immediately and after 24 hours du to the presence of non-target branching leave in the first measurement. A  difference is observed between the two time points, with the 24-hour measurements being more consistent with the other buildings. Consequently, only the 24-hour measurements for BUI 1 and 2 were retained in the dataset.
+
+data <- data |> 
+  filter(
+    !(
+      month == "July" & 
+      proj_2025 == "Traits" & 
+      age_class == "Building" & 
+      plant_nr %in% c("1", "2") & 
+      (remark != "harvested after 24h" | is.na(remark))
+    )
+  )
 ```
 
 # Check fluorescence outliers
@@ -863,64 +1076,94 @@ ggplot(data |>  filter(proj_2025 == "Traits"),
 
 ## March
 # MAT 3 have a high fv/fm ; same for BUI 5 
+# MAT and BUI low : brown leaves
 # low points for NB 5, 7 and 8 --> maybe due to the season
 
 ## May 
 # MAT 8 old : low --> brown leaves
 # PIO 8 (AUS1188) : 0.38, low --> envelope checked
 
+## July
+# MAT 8 (BCP2114) : 0.01 envelope checked
+
 #### final fluorescence TT Hot 
-# High value for BUI 4 (we don't have that in the initial fluo graph)
+# High value for BUI 4, we don't have that in the initial fluo graph --> not done on the same leaves than initial fv/fm.
 ```
 
 ```{r}
 #| label: check-fluorescence-outliers-TTHot
 #| warning: false
 
-data |> 
-  filter(proj_2025 == "TT Hot") |> 
-  
-  ggplot(aes(x = as.numeric(as.character(temp_exp)), 
-             y = fv_fm_final,
-             group = plant_nr,      
-             color = plant_nr)) +
-  
-  geom_point(size = 2, alpha = 0.8,
-             position = position_jitter(width = 0.15)) +
-  geom_line() +
+# Filter initial dataset for TT Hot
+data_filtered <- data |> 
+  filter(proj_2025 == "TT Hot")
 
-  facet_grid(age_class ~ month ~ leaf_age) + 
-  theme_bw() +
-  labs(
-    x = "Temperature",
-    y = "fv_fm_final",
-    title = "Fv/Fm response to hot temperature across plants, age classes and months"
-  )
+# Loop through each unique month to generate a distinct plot
+unique(data_filtered$month) |> 
+  walk(function(m) {
+    p <- data_filtered |> 
+      filter(month == m) |> 
+      ggplot(aes(x = as.numeric(as.character(temp_exp)), 
+                 y = fv_fm_final,
+                 group = interaction(plant_nr, age_class),      
+                 color = factor(plant_nr))) +
+      
+      geom_point(size = 2, alpha = 0.8,
+                 position = position_jitter(width = 0.15)) +
+      geom_line() +
+      
+      # Single-row panel grid for leaf_age (old vs young) and age_class
+      facet_grid(age_class ~ leaf_age) + 
+      
+      theme_bw() +
+      labs(
+        x = "Temperature",
+        y = "fv_fm_final",
+        color = "plant_nr",
+        title = paste("Fv/Fm response to hot temperature - Month:", m)
+      )
+    
+    print(p)
+  })
+
 ```
 
 ```{r}
 #| label: check-fluorescence-outliers-TTCold
 #| warning: false
 
-data |> 
-  filter(proj_2025 == "TT Cold") |> 
-  mutate(temp_exp = factor(temp_exp, levels = c("5", "0", "-5", "-10","-15", "-20"))) |>
-  ggplot(aes(x = temp_exp, 
-             y = fv_fm_final,
-             group = plant_nr,      
-             color = plant_nr)) +
-  
-  geom_point(size = 2, alpha = 0.8,
-             position = position_jitter(width = 0.15)) +
-  geom_line() +
+# Filter initial dataset for TT Cold
+data_filtered <- data |> 
+  filter(proj_2025 == "TT Cold")
 
-  facet_grid(age_class ~ month ~ leaf_age) + 
-  theme_bw() +
-  labs(
-    x = "Temperature",
-    y = "fv_fm_final",
-    title = "Fv/Fm response to cold temperature across plants, age classes and months"
-  )
+# Loop through each unique month to generate a distinct plot
+unique(data_filtered$month) |> 
+  walk(function(m) {
+    p <- data_filtered |> 
+      filter(month == m) |> 
+      ggplot(aes(x = as.numeric(as.character(temp_exp)), 
+                 y = fv_fm_final,
+                 group = interaction(plant_nr, age_class),      
+                 color = factor(plant_nr))) +
+      
+      geom_point(size = 2, alpha = 0.8,
+                 position = position_jitter(width = 0.15)) +
+      geom_line() +
+      
+      # Single-row panel grid for leaf_age (old vs young) and age_class
+      facet_grid(age_class ~ leaf_age) + 
+      
+      theme_bw() +
+      labs(
+        x = "Temperature",
+        y = "fv_fm_final",
+        color = "plant_nr",
+        title = paste("Fv/Fm response to cold temperature - Month:", m)
+      )
+    
+    print(p)
+  })
+
 ```
 
 # Saving clean dataset
@@ -928,7 +1171,10 @@ data |>
 ```{r}
 #| label: clean-dataset
 
-setwd("C:/Users/poula/Documents/M2_PAMEQ/Stage M2/Analyse statistique/thermotolerance/data/clean_data")
 
-write.csv2(data, file = "Seasonal Calluna Thermal Tolerance and Plant Functional Traits.csv", row.names = FALSE)
+write.csv2(
+  data, 
+  file = "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/Analyse statistique/thermotolerance/data/clean_data/Seasonal Calluna Thermal Tolerance and Plant Functional Traits.csv", 
+  row.names = FALSE
+)
 ```
