@@ -102,8 +102,6 @@ clean_sheet_data <- function(file_path, sheet_name) {
   
   return(df)
 }
-
-
 ```
 
 ```{r}
@@ -171,9 +169,6 @@ leaf_area_raw <- leaf_area_raw |>
   ) |> 
   # remove old column, comments is deleted as should be in the trait datasheet area check tab
   select(-c(ID, n,leaf_area))
-
-
-
 
 # Choose correct value per envelope_ID based on the source file, i.e. edited or not
 leaf_area_clean <- leaf_area_raw |> 
@@ -263,7 +258,6 @@ data <- data |>
   )
 
 unique(data$remark)
-
 ```
 
 ```{r}
@@ -297,9 +291,6 @@ data <- data |>
       TRUE ~ leaf_area_scanned_bulk_nr
     )
   )
-
-
-
 ```
 
 ```{r}
@@ -1177,4 +1168,38 @@ write.csv2(
   file = "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/Analyse statistique/thermotolerance/data/clean_data/Seasonal Calluna Thermal Tolerance and Plant Functional Traits.csv", 
   row.names = FALSE
 )
+
+# ==============================================================================
+# DATASET OVERVIEW & SAMPLE COUNTS (Total: 2598 rows)
+# ==============================================================================
+# 
+# FACTOR LEGEND:
+# - 8  : Number of plants per group
+# - 4  : Age classes
+# - 2  : Leaf ages
+# - 9  : Heat tolerance measurements
+# - 6  : Cold tolerance measurements
+# - 5  : Plant functional traits
+#
+# ------------------------------------------------------------------------------
+
+# 1. MARCH (Total: 645)
+# ------------------------------------------------------------------------------
+# - HOT    : 288 | (8 plants * 4 age_classes * 9 temps)
+# - COLD   : 192 | (8 plants * 4 age_classes * 6 temps)
+# - TRAITS : 165 | (8 plants * 4 age_classes * 5 traits) + 5 [BUI 8 harvested twice by error]
+
+# 2. MAY (Total: 1273)
+# ------------------------------------------------------------------------------
+# - HOT    : 576 | (8 plants * 4 age_classes * 2 leaf_ages * 9 temps)
+# - COLD   : 384 | (8 plants * 4 age_classes * 2 leaf_ages * 6 temps)
+# - TRAITS : 313 | (8 plants * 4 age_classes * 2 leaf_ages * 5 traits) - 1 [NB 4: AJD4636] - 1 [BUI 2:APL2797] - 5 [NB 8 young]
+
+# 3. JULY (Total: 680)
+# ------------------------------------------------------------------------------
+# - HOT    : 306 | (8 plants * 4 age_classes * 9 temps) + 18 [BUI 10 & 18]
+# - COLD   : 204 | (8 plants * 4 age_classes * 6 temps) + 12 [BUI 10 & 18]
+# - TRAITS : 170 | (8 plants * 4 age_classes * 5 traits) 
+#                  + 10 [BUI 1 & 2 (24h)] - 10 [BUI 1 & 2 (usual)] 
+#                  + 10 [BUI 10 & 18]
 ```
