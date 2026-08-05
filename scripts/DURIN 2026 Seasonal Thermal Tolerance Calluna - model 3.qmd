@@ -8,6 +8,29 @@ editor: visual
 # Import data
 
 ```{r}
+#| label: setup
+#| message: false 
+
+# installing / loading packages
+library(readxl) # Enables excel file import
+library(tidyverse) # Contains many helpful packages, i.e. dplyr etc.
+library(janitor) # Has tools for data cleaning 
+library(lubridate) # Date and time formatting
+library(readr) # Data importation functions
+library(stringr) # String and character text
+library(future) # Using severals cores at the same time
+library(ggcorrplot)
+library(emmeans)
+library(car) # for the Anova
+library(dplyr)
+library(future)
+```
+
+```{r}
+data <- read.csv2("C:/Users/poula/Documents/M2_PAMEQ/Stage M2/Analyse statistique/thermotolerance/data/clean_data/Seasonal Calluna Thermal Tolerance and Plant Functional Traits.csv")
+```
+
+```{r}
 #| label: Create-united-columns-traits-data-frame
 
 traits_data <- data |> 
@@ -22,8 +45,76 @@ united_columns_traits_plante <- unite(
   site_name, species, month,  age_class, plant_nr,leaf_age,
   sep = "_",
   remove = TRUE
-) |> 
+) |>
   na.omit()
+```
+
+## Effect of leaf age on traits
+
+```{r}
+#| label: Create-data-frame-May-young-old
+
+May_young_old <- traits_data |> 
+  filter(month=="May")|> 
+  drop_na() # some leaves were not harvested for some plants
+
+```
+
+```{r}
+#| label: PCA
+
+
+library(FactoMineR)
+library(factoextra)
+
+traits_old_young <- May_young_old[, c(
+  "SLA",
+  "leaf_area",
+  "LDMC",
+  "height_vegetative"
+)]
+
+res.pca <- PCA(
+  traits_old_young,
+  scale.unit = TRUE,
+  graph = FALSE
+)
+
+# Graphique des individus
+fviz_pca_ind(
+  res.pca,
+  geom.ind = "point",
+  pointsize = 3
+) +
+  theme_classic()
+
+# Graphique des variables
+fviz_pca_var(
+  res.pca,
+  col.var = "contrib"
+) +
+  theme_classic()
+
+
+```
+
+```{r}
+#| label: check-performance-models
+
+modele_lm_2 <- lm(estimate ~ leaf_age * age_class, data = May_young_old)
+modele_lm_1 <- lm(estimate ~ leaf_age, data = May_young_old)
+
+AIC(modele_lm_1, modele_lm_2)
+BIC(modele_lm_1, modele_lm_2)
+
+anova(modele_lm_1, modele_lm_2)
+summary(modele_lm_1)$adj.r.squared
+summary(modele_lm_2)$adj.r.squared
+
+```
+
+```{r}
+
 ```
 
 # Hot T50
@@ -196,7 +287,7 @@ anova(mod_hveg)
 **Summary of Univariate ANOVA Models on Functional Traits**
 
 | Functional Trait | Age Class Effect (`age_class`) | Season Effect (`month`) | Interaction Effect (`Age x Month`) |
-|:---|:--:|:--:|:--:|
+|:-----------------|:----------------:|:----------------:|:----------------:|
 | SLA (Specific Leaf Area) | Ultra-significant (\*\*\*) | Ultra-significant (\*\*\*) | Non-significant |
 | LDMC (Leaf Dry Matter Content) | Non-significant | Ultra-significant (\*\*\*) | Non-significant |
 | Leaf Area | Ultra-significant (\*\*\*) | Marginal / Tendency (.) | Non-significant |
@@ -447,4 +538,35 @@ ggplot(coef_mod,
     axis.text.y = element_text(size = 12),
     axis.title.x = element_text(size = 14)
   )
+```
+
+# New: Effect of leaf_age_2 and age_class on traits (pca dim)
+
+## Import dataset
+
+```{r}
+#| label: Import-dataset
+
+pca_dim <- readRDS("C:/Users/poula/Documents/M2_PAMEQ/Stage M2/Analyse statistique/thermotolerance/data/clean_data/pca_dim.rds")
+
+```
+
+## Models
+
+```{r}
+#| label: models
+#| fig-height: 10
+
+# Model for PCA 1 (Dim1)
+model_pca1 <- lm(PCA1_score ~ age_class * leaf_age_2, data = pca_dim)
+performance::check_model(model_pca1)
+summary(model_pca1)
+anova(model_pca1)
+
+# Model for PCA 2 (Dim2)
+model_pca2 <- lm(PCA2_score ~ age_class * leaf_age_2, data = pca_dim)
+performance::check_model(model_pca2)
+summary(model_pca2)
+anova(model_pca2)
+
 ```

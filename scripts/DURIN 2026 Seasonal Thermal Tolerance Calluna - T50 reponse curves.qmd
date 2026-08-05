@@ -5,6 +5,29 @@ format: html
 editor: visual
 ---
 
+```{r}
+#| label: setup
+#| message: false 
+
+# installing / loading packages
+library(readxl) # Enables excel file import
+library(tidyverse) # Contains many helpful packages, i.e. dplyr etc.
+library(janitor) # Has tools for data cleaning 
+library(lubridate) # Date and time formatting
+library(readr) # Data importation functions
+library(stringr) # String and character text
+library(future) # Using severals cores at the same time
+library(ggcorrplot)
+library(emmeans)
+library(car) # for the Anova
+library(dplyr)
+# install.packages("remotes")
+# remotes::install_github("richardjtelford/thermalTolerance")
+library(thermalTolerance)
+
+library(future)
+```
+
 # Import data
 
 ```{r}
@@ -60,63 +83,22 @@ united_columns_htol_plant <- unite(
 # NA for BUI 3 May old, BUI 2 May young, MAT 7 May young --> no leaf harvested
 ```
 
-## Removing plants
-
-```{r}
-# #| label:  plants-removed-from-T50-estimate
-# ## Plants that crashed the script to estimate T50
-# 
-# removed <- united_columns_htol_plant |>
-#   filter(
-#     new_id %in% c(
-#       "Lygra_Calluna vulgaris_Mature_8_May_old_TT Hot",
-#       "Lygra_Calluna vulgaris_Building_4_May_young_TT Hot",
-#       "Lygra_Calluna vulgaris_Mature_4_May_young_TT Hot",
-#       "Lygra_Calluna vulgaris_Pioneer_8_May_young_TT Hot"
-#     )
-#   )
-# 
-# removed |>
-#   mutate(temp_exp = as.numeric(as.character(temp_exp)),
-#          fv_fm_final = as.numeric(as.character(fv_fm_final))) |>
-#   ggplot(aes(x = temp_exp, y = fv_fm_final, color = new_id)) +
-#   facet_grid(new_id ~ .) +
-#   geom_line()
-```
-
-```{r}
-# #| label: concatenated-columns-per-plant-cleaned
-# 
-# united_columns_htol_plant |> 
-#  filter(
-#     !new_id %in% c(
-#       "Lygra_Calluna vulgaris_Mature_8_May_old_TT Hot",
-#       "Lygra_Calluna vulgaris_Building_4_May_young_TT Hot",
-#       "Lygra_Calluna vulgaris_Mature_4_May_young_TT Hot",
-#       "Lygra_Calluna vulgaris_Pioneer_8_May_young_TT Hot"
-#     )
-#   ) # removed because they crashed the T50 estimate script
-```
-
 ## Curves
 
 ```{r}
 #| label: T50-curves-and-plots-per-plant
 #| warning: false
 
-# install.packages("remotes")
-# remotes::install_github("richardjtelford/thermalTolerance")
-library(thermalTolerance)
+#first run for every plantes exepte bui and mat of march because already dead before the experiment
 
-library(future)
-plan(sequential)
+
 plan(multisession) # activate parallel processing
-set.seed(19) # avoir la même chose a chaque fois comme ça il n'y a pas des moments où ça marche et d'autres non  
+set.seed(19) # avoir la même chose a chaque fois comme ça il n'y a pas des moments où ça marche et d'autres non
+# united_columns_htol_plant2 <- united_columns_htol_plant |> filter(between(group_indices(), 56, 100), .by = "new_id")
 
-
-TTHot_plant <- psiiht(temperature = as.numeric(as.character(united_columns_htol_plant$temp_exp)), 
+TTHot_plant <- psiiht(temperature = united_columns_htol_plant$temp_exp, 
                warming = TRUE,
-               fvfm = as.numeric(as.character(united_columns_htol_plant$fv_fm_final)),
+               fvfm = united_columns_htol_plant$fv_fm_final,
                control_temp = 20,
                id = united_columns_htol_plant$new_id,
                boots = 1000)# put 1000
@@ -126,49 +108,89 @@ TTHot_plant_sum <- summary(TTHot_plant) # see summary output for T50 values (not
 autoplot(TTHot_plant) # plots logistic curves and dashed lines for Tcrit, T50, T95
 
 
+#saving
+
+saveRDS(TTHot_plant, file = "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/Analyse statistique/thermotolerance/data/raw_data/TTHot_plant_results.rds")
+
+write.csv2(
+  TTHot_plant_sum, 
+  file = "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/Analyse statistique/thermotolerance/data/raw_data/TTHot_plant_sum.csv", 
+  row.names = FALSE
+)
 ```
 
-## Cleaning T50 estimate
-
 ```{r}
-#| label: cleaning-T50-estimate
+#| label: T50-curves-unsucessful
 #| warning: false
 
-## March
-# no results : BUI and MAT (--> removed)
+# second run for the one that could give us a courbe before but didn't because of the random choice and seed 19
+#liste des plantes qui n'ont pas fait de courbes mais aurait pu
 
-TTHot_plant_sum_2 <- TTHot_plant_sum |> 
+unsucessful_Hot_T50_curves <- united_columns_htol_plant |>
   filter(
-    !is.nan(prop_success) & prop_success >= 0.5,
-         )
-## a expliquer et sourcer
+    new_id %in% c(
+      "Lygra_Calluna vulgaris_Building_3_July_young_TT Hot",
+      "Lygra_Calluna vulgaris_Building_6_July_young_TT Hot",
+      "Lygra_Calluna vulgaris_Building_6_May_young_TT Hot",
+      "Lygra_Calluna vulgaris_Building_8_May_old_TT Hot",
+      "Lygra_Calluna vulgaris_Mature_3_July_young_TT Hot",
+      "Lygra_Calluna vulgaris_Mature_4_July_young_TT Hot",
+      "Lygra_Calluna vulgaris_Newly Burnt_2_July_young_TT Hot",
+      "Lygra_Calluna vulgaris_Newly Burnt_5_May_young_TT Hot"
+    )
+  )
 
+unsucessful_Hot_T50_curves |>
+  mutate(temp_exp = as.numeric(as.character(temp_exp)),
+         fv_fm_final = as.numeric(as.character(fv_fm_final))) |>
+  ggplot(aes(x = temp_exp, y = fv_fm_final, color = new_id)) +
+  facet_grid(new_id ~ .) +
+  geom_line()
 
-# extraction de la liste des id qu'on garde pour après 
-list_ids <- TTHot_plant_sum_2$id
-
-#resultats filtrés qu'on garde
-filtered_results_TTHot_plant <- TTHot_plant$results[list_ids]
+# On remarque qu'il y a un pique à 46 pour ces courbes mes on distingues aussi clairement un pente qui pourrait nous donner une T50. Essayer de reborner la courbe.
 ```
 
 ```{r}
-#| label: saving-hot-T50-estimate
-
-setwd("C:/Users/poula/Documents/M2_PAMEQ/Stage M2/Analyse statistique/thermotolerance/data/clean_data")
-
-write.csv2(TTHot_plant_sum, file = "TTHot_plant_sum.csv", row.names = FALSE)
-
+# #| label: T50-curves-unsucessful-new-run
+# #| warning: false
+# 
+# # on reborne la courbes entre 46 et 56 car 46 est le point le plus élevée pour ces courbes et on refait les T50 reponse curves
+# set.seed(19)
+# 
+# unsucessful_Hot_T50_curves_filtered <- unsucessful_Hot_T50_curves |>
+#   filter(temp_exp >= 44 & temp_exp <= 56)
+# 
+# plan(multisession)
+# 
+# 
+# # 4. Lancer psiiht directement sur ton nouveau tableau
+# TTHot_run_2 <- psiiht(
+#   temperature  = unsucessful_Hot_T50_curves_filtered$temp_exp, 
+#   warming      = TRUE,
+#   fvfm         = unsucessful_Hot_T50_curves_filtered$fv_fm_final,
+#   control_temp = 44,
+#   id           = unsucessful_Hot_T50_curves_filtered$new_id,
+#   boots        = 1000
+# )
+# 
+# # 5. Résumé et graphiques
+# TTHot_run_2_sum <- summary(TTHot_run_2)
+# 
+# 
+# autoplot(TTHot_run_2)
+# 
+# #seulement une courbe se trace, et son prop_sucess est de 0.2 ce qui n'est pas suffisant. --> tant pis.
 ```
 
-## Plot
+## Barres d'erreurs
 
 ```{r}
-#| label: T50-plots-per-plant
+#| label: T50-curves-and-plots-per-plant
 #| warning: false
+
 
 summarise_htol_plant <- function(res, id) {
 
-  # si c'est null on met des NA pour que ça ne bloque pas
   if (is.null(res)) {
     return(data.frame(
       id = id,
@@ -179,8 +201,7 @@ summarise_htol_plant <- function(res, id) {
       upper = NA
     ))
   }
-
-  # sinon on calucule normalement
+  
   data.frame(
     id = id,
     metric = c("T50", "T95", "Tcrit"),
@@ -200,24 +221,28 @@ summarise_htol_plant <- function(res, id) {
 }
 
 # Run the summarize function for each ID output
+
+TTHot_plant <- readRDS("C:/Users/poula/Documents/M2_PAMEQ/Stage M2/Analyse statistique/thermotolerance/data/raw_data/TTHot_plant_results.rds")
+
 TTHot_plant_out <- Map(
   summarise_htol_plant, # function
   TTHot_plant$results, # extract the results part of the psiiht output
   names(TTHot_plant$results)  # extract the ID from the psiiht output
   )
-
-# # Run the summarize function for each ID output
-# TTHot_plant_out <- Map(
-#   summarise_htol_plant, # function
-#   filtered_results_TTHot_plant, # extract the results part of the psiiht output
-#   names(filtered_results_TTHot_plant) # extract the ID from the psiiht output
-# )
-
 # Create the dataframe by rowbinding
 TTHot_thermal_plant <- do.call(rbind, TTHot_plant_out)
 
+TTHot_plant_sum <- read.csv2("C:/Users/poula/Documents/M2_PAMEQ/Stage M2/Analyse statistique/thermotolerance/data/raw_data/TTHot_plant_sum.csv")
+
+TTHot_plant_success <- TTHot_plant_sum |>
+  select(id, prop_success)
+
+#fusion du tableau avec les prope sucess et du tableau avec les estimation leurs erreurs
+TTHot_thermal_plant_combined <- TTHot_thermal_plant |>
+  left_join(TTHot_plant_success, by = "id")
+
 # String split back to columns the ID
-TTHot_wide_plant <- TTHot_thermal_plant |>
+TTHot_wide_plant <- TTHot_thermal_plant_combined |>
   separate_wider_delim(
     cols = id, # the column to split
     delim = "_", # how is the column seperated
@@ -238,47 +263,99 @@ TTHot_wide_plant <- TTHot_thermal_plant |>
   ) |>
   # Relevel factors in natural order
   mutate(
-    age_class = factor(age_class, levels = c("Newly Burnt","Pioneer", "Building", "Mature")))
+    age_class = factor(age_class, levels = c("Newly Burnt","Pioneer", "Building", "Mature"))) |> 
+  filter(metric == "T50")
+```
 
-# Create a preliminary plot focusing on T50 metric
-TTHot_wide_plant |>
-  filter(metric == "T50") |>
-ggplot(aes(x = age_class,
+## Cleaning T50 estimate
+
+```{r}
+#| label: cleaning-T50-estimate
+#| warning: false
+
+## on enlève les lignes ou le prop success est inf a 0.5.
+
+TTHot_wide_plant_clean <- TTHot_wide_plant |> 
+  filter(
+    !is.nan(prop_success) & prop_success >= 0.5,
+         )
+
+write.csv2(
+  TTHot_wide_plant_clean, 
+  file = "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/Analyse statistique/thermotolerance/data/clean_data/TTHot_wide_plant_clean.csv", 
+  row.names = FALSE
+)
+
+```
+
+## Plot
+
+```{r}
+#| label: T50-plots-per-plant
+#| warning: false
+
+
+TTHot_wide_plant_clean_plot <- TTHot_wide_plant_clean |>
+  mutate(
+    plant_nr = as.factor(plant_nr), 
+    month = factor(month, levels = c("March", "May", "July")),
+    age_class = factor(age_class, levels = c("Newly Burnt", "Pioneer", "Building","Mature"))
+  )
+
+
+p <- ggplot(TTHot_wide_plant_clean_plot, 
+       aes(x = age_class,
            y = estimate,
            color = plant_nr)) +
   geom_point(size = 2,
-              position = position_dodge(width = 0.6)) +
+             position = position_dodge(width = 0.6)) +
   geom_errorbar(aes(ymin = estimate - se, ymax = estimate + se),
                 width = 0.2,
                 position = position_dodge(width = 0.6)) +
-  facet_grid(month ~ leaf_age) +
+  
+  scale_color_manual(values = c(
+    "1" = "#E69F00",
+    "2" = "#56B4E9",
+    "3" = "#009E73",
+    "4" = "#F0E442", 
+    "5" = "#0072B2", 
+    "6" = "#D55E00", 
+    "7" = "#CC79A7",
+    "8" = "#999999",
+    "10" = "#1170AA",
+    "18" = "#A6761D"
+    )) +
+  
+  facet_grid(month ~ leaf_age, drop = FALSE) + 
   labs(
     x = "Age class",
     y = "T50 (°C)",
     color = "Plant number",
-    title = bquote("Heat tolerance ("*T[50]*") of" ~ italic("Calluna vulgaris") ~ "across different age classes and seasons"),
+    title = bquote("Hot tolerance ("*T[50]*") of" ~ italic("Calluna vulgaris") ~ "across different age classes and seasons"),
     subtitle = "Points represent bootstrap means; bars show ±1 SE"
   ) +
- stat_summary(
-  aes(group = age_class),
-  fun.data = function(y) {
-    data.frame(y = 30, label = paste0("n = ", length(y)))
-  },
-  geom = "text",
-  color = "grey40",
-  size = 3.2,
-  vjust = 0
+  stat_summary(
+    aes(group = age_class),
+    fun.data = function(y) {
+      data.frame(y = 30, label = paste0("n = ", length(y))) 
+    },
+    geom = "text",
+    color = "grey40",
+    size = 3.2,
+    vjust = 0
   ) +
   theme_bw()
 
-```
+print(p)
 
-```{r}
-#| label: saving-hot-T50-data-frame
-
-setwd("C:/Users/poula/Documents/M2_PAMEQ/Stage M2/Analyse statistique/thermotolerance/data/clean_data")
-
-write.csv2(TTHot_wide_plant, file = "TTHot_wide_plant.csv", row.names = FALSE)
+ggsave(
+  filename = "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/Figures/hot_tolerance_t50.png",
+  plot = p,                             
+  width = 10,                           
+  height = 7,                           
+  units = "in",                         
+  dpi = 300                             
+)
 
 ```
 
@@ -329,28 +406,6 @@ united_columns_cold_plant$temp_num <- as.numeric(as.character(united_columns_col
 united_columns_cold_plant$temp_exp_order <- united_columns_cold_plant$temp_num * -1
 ```
 
-## Removing plants
-
-```{r}
-#| label:  plants-removed-from-cold-T50-estimate
-## Plants that crashed the script to estimate T50
-
-removed <- united_columns_cold_plant |>
-  filter(
-    new_id %in% c(
-      "Lygra_Calluna vulgaris_Newly Burnt_3_March_old_TT Cold"
-    )
-  )
-
-removed |>
-  mutate(temp_exp = as.numeric(as.character(temp_exp)),
-         fv_fm_final = as.numeric(as.character(fv_fm_final))) |>
-  mutate(temp_exp = factor(temp_exp, levels = c("5", "0", "-5", "-10","-15", "-20"))) |> 
-  ggplot(aes(x = temp_exp, y = fv_fm_final, color = new_id, group = new_id)) +
-  facet_grid(new_id ~ .) +
-  geom_line()
-```
-
 ## Curves
 
 ```{r}
@@ -367,10 +422,10 @@ plan(multisession) # activate parallel processing
 set.seed(19) # avoir la même chose a chaque fois comme ça il n'y a pas des moments où ça marche et d'autres non  
 
 
-TTCold_plant <- psiiht(temperature = as.numeric(as.character(united_columns_cold_plant$temp_exp_order)), 
+TTCold_plant <- psiiht(temperature = united_columns_cold_plant$temp_exp_order, 
                warming = FALSE, # cold treatment
-               fvfm = as.numeric(as.character(united_columns_cold_plant$fv_fm_final)),
-               control_temp = 5,
+               fvfm = united_columns_cold_plant$fv_fm_final,
+               control_temp = 0,
                id = united_columns_cold_plant$new_id,
                boots = 1000)# put 1000
 
@@ -379,23 +434,19 @@ TTCold_plant_sum <- summary(TTCold_plant) # see summary output for T50 values (n
 autoplot(TTCold_plant) # plots logistic curves and dashed lines for Tcrit, T50, T95
 # /!\ the plots are the other way around regarding the temperatures.
 
-## March
-# crash the model : NB 3 old (no Tcrit) --> removed
-# no results (no curves) : a lot of them 
+#saving
+
+saveRDS(TTCold_plant, file = "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/Analyse statistique/thermotolerance/data/raw_data/TTCold_plant_results.rds")
+
+write.csv2(
+  TTCold_plant_sum, 
+  file = "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/Analyse statistique/thermotolerance/data/raw_data/TTCold_plant_sum.csv", 
+  row.names = FALSE
+)
 
 ```
 
-## Cleaning T50 estimate
-
-```{r}
-
-```
-
-```{r}
-#| label: saving-hot-T50-estimate
-```
-
-## Plot
+## Barres d'erreurs
 
 ```{r}
 #| label: Cold-T50-plots-per-plant
@@ -432,6 +483,7 @@ summarise_ctol_plant <- function(res, id) {
   )
 }
 
+TTCold_plant <- readRDS("C:/Users/poula/Documents/M2_PAMEQ/Stage M2/Analyse statistique/thermotolerance/data/raw_data/TTCold_plant_results.rds")
 
 # Run the summarize function for each ID output
 TTCold_plant_out <- Map(
@@ -452,8 +504,17 @@ TTCold_thermal_plant <- TTCold_thermal_plant |>
     se       = abs(se) # Standard error stays positive as it measures variance
   )
 
+TTCold_plant_sum <- read.csv2("C:/Users/poula/Documents/M2_PAMEQ/Stage M2/Analyse statistique/thermotolerance/data/raw_data/TTCold_plant_sum.csv")
+
+TTCold_plant_success <- TTCold_plant_sum |>
+  select(id, prop_success)
+
+#fusion du tableau avec les prope sucess et du tableau avec les estimation leurs erreurs
+TTCold_thermal_plant_combined <- TTCold_thermal_plant |>
+  left_join(TTCold_plant_success, by = "id")
+
 # String split back to columns the ID
-TTCold_wide_plant <- TTCold_thermal_plant |>
+TTCold_wide_plant <- TTCold_thermal_plant_combined  |>
   separate_wider_delim(
     cols = id, # the column to split
     delim = "_", # how is the column seperated
@@ -474,38 +535,98 @@ TTCold_wide_plant <- TTCold_thermal_plant |>
   ) |> 
   # Relevel factors in natural order
   mutate(
-    age_class = factor(age_class, levels = c("Newly Burnt","Pioneer", "Building", "Mature")))
+    age_class = factor(age_class, levels = c("Newly Burnt","Pioneer", "Building", "Mature"))) |> 
+  filter(metric == "T50")
+```
+
+## Cleaning T50 estimate
+
+```{r}
+#| label: cleaning-T50-estimate
+#| warning: false
+
+## on enlève les lignes ou le prop success est inf a 0.5.
+
+TTCold_wide_plant_clean <- TTCold_wide_plant |> 
+  filter(
+    !is.nan(prop_success) & prop_success >= 0.5,
+         )
+
+write.csv2(
+  TTCold_wide_plant_clean, 
+  file = "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/Analyse statistique/thermotolerance/data/clean_data/TTCold_wide_plant_clean.csv", 
+  row.names = FALSE
+)
+```
+
+## Plot
+
+```{r}
+#| label: T50-plots-per-plant
+#| warning: false
+
+TTCold_wide_plant_clean <- read.csv2("C:/Users/poula/Documents/M2_PAMEQ/Stage M2/Analyse statistique/thermotolerance/data/clean_data/TTCold_wide_plant_clean.csv")
 
 # Create a preliminary plot focusing on T50 metric
-TTCold_wide_plant |> 
-  filter(metric == "T50") |> 
-ggplot(aes(x = age_class,
+
+TTCold_wide_plant_clean_plot <- TTCold_wide_plant_clean |>
+  mutate(
+    plant_nr = as.factor(plant_nr), 
+    month = factor(month, levels = c("March", "May", "July")),
+    age_class = factor(age_class, levels = c("Newly Burnt", "Pioneer", "Building","Mature"))
+  )
+
+p <- ggplot(TTCold_wide_plant_clean_plot, 
+       aes(x = age_class,
            y = estimate,
            color = plant_nr)) +
   geom_point(size = 2,
-              position = position_dodge(width = 0.6)) +
+             position = position_dodge(width = 0.6)) +
   geom_errorbar(aes(ymin = estimate - se, ymax = estimate + se),
                 width = 0.2,
                 position = position_dodge(width = 0.6)) +
-  facet_grid(month ~ leaf_age) +
+  
+  scale_color_manual(values = c(
+    "1" = "#E69F00", 
+    "2" = "#56B4E9", 
+    "3" = "#009E73", 
+    "4" = "#F0E442", 
+    "5" = "#0072B2", 
+    "6" = "#D55E00", 
+    "7" = "#CC79A7", 
+    "8" = "#999999",
+    "10" = "#1170AA",
+    "18" = "#A6761D"
+  )) +
+  
+  facet_grid(month ~ leaf_age, drop = FALSE) + 
   labs(
-    x = "Age Class",
+    x = "Age class",
     y = "T50 (°C)",
-    color = "plant number",
-    title = bquote("He tolerance ("*T[50]*") of" ~ italic("Calluna vulgaris") ~ "across different age classes and seasons"),
-    subtitle = "Points show mean bootstrap estimate; bars show ±1 SE"
+    color = "Plant number",
+    title = bquote("Cold tolerance ("*T[50]*") of" ~ italic("Calluna vulgaris") ~ "across different age classes and seasons"),
+    subtitle = "Points represent bootstrap means; bars show ±1 SE"
   ) +
-   stat_summary(
-  aes(group = age_class),
-  fun.data = function(y) {
-    data.frame(y = -48, label = paste0("n = ", length(y)))
-  },
-  geom = "text",
-  color = "grey40",
-  size = 3.2,
-  vjust = 0
+  stat_summary(
+    aes(group = age_class),
+    fun.data = function(y) {
+      data.frame(y = -15, label = paste0("n = ", length(y)))
+    },
+    geom = "text",
+    color = "grey40",
+    size = 3.2,
+    vjust = 0
   ) +
   theme_bw()
+
+ggsave(
+  filename = "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/Figures/cold_tolerance_t50.png",
+  plot = p,                             
+  width = 10,                           
+  height = 7,                           
+  units = "in",                         
+  dpi = 300                             
+)
 ```
 
 ## 

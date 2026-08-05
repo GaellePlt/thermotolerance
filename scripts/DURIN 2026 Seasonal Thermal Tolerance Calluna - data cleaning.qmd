@@ -96,6 +96,9 @@ clean_sheet_data <- function(file_path, sheet_name) {
       mutate(envelope_ID = case_when(
         grepl("ADDX1933", envelope_ID) ~ "ADX1933",
         grepl("AGS", envelope_ID) ~ "AGS4838",
+        envelope_ID == "ATY8226"  ~ "ATY8626",
+        envelope_ID == "AUHG0872" ~ "AUG0872",
+        envelope_ID == "AUE3130"  ~ "AUE3110",
         TRUE ~ envelope_ID
       ))
   }
@@ -129,6 +132,18 @@ raw_data <- raw_data |>
     age_class = factor(age_class, 
                        levels = c("Newly Burnt", "Pioneer", "Building", "Mature"),)
   )
+
+# #wrong barcode
+# 
+# raw_data <- raw_data |> 
+# mutate(
+#     envelope_ID = case_when(
+#       envelope_ID == "ATY8226"  ~ "ATY8626",
+#       envelope_ID == "AUHG0872" ~ "AUG0872",
+#       envelope_ID == "AUE3130"  ~ "AUE3110",
+#       TRUE ~ envelope_ID
+#     )
+#   )
 ```
 
 ## Leaf area dataset
@@ -280,6 +295,9 @@ data <- data |>
       # May
       # Partial leaf fragment; unknown parent leaf
       envelope_ID %in% c("AIR6318", "AMI3269", "ANP7023", "AQI1129", "AQT4821") ~ 4,
+      # no leaf harvested 
+      envelope_ID %in% c("AOZ0443", "AOY6901", "AOX5024", "AQI1129", "AQT4821") ~ 0,
+     
 
       # July
       # Partial leaf fragment; unknown parent leaf
@@ -320,6 +338,20 @@ data <- data |>
 data <- data |> 
 ## wet mass
   filter(envelope_ID != "AJD4636" | is.na(envelope_ID))|>  #NB 4 : 0.05708 in data frame ; 0.05708 on the envelope AJD4636 and 4 leaves on the scanns. Excluded sample: presence of non-target branching leaf causing artificially high wet mass.
+ # mutate(
+ #    envelope_ID = case_when(
+ #      envelope_ID == "ATY8226"  ~ "ATY8626",
+ #      envelope_ID == "AUHG0872" ~ "AUG0872",
+ #      envelope_ID == "AUE3130"  ~ "AUE3110",
+ #      TRUE ~ envelope_ID
+ #    )
+ #  ) |>  #wrong ID
+  mutate(
+    leaf_area_sum = case_when(
+      envelope_ID %in% c("AOZ0443", "AOY6901", "AOX5024") ~ NA_real_,
+      TRUE ~ leaf_area_sum
+    )
+  ) |> # no leaf harvested 
   mutate(wet_mass_g = case_when(
     grepl("AUX0977", envelope_ID) ~ 0.01069,
     TRUE ~ wet_mass_g
@@ -1157,6 +1189,128 @@ unique(data_filtered$month) |>
 
 ```
 
+# leaf_age modification
+
+l'age de la feuille changeant avec l'année, il a été décidé qu'il ne serait plus question de old ou young ni de moi mais la leaf_age au court d'une année allant de may young à May old.
+
+Seul le mois de septembre 2026 n'a pas encore de donnée.
+
+```{r}
+#| label: create-entire-dataset
+
+# Import the new dataset
+nov_jan <- read.csv2(
+  "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/Analyse statistique/thermotolerance/data/clean_data/DURIN_Clean_Seasonal_Thermal_Tolerance_Bente_Msc.csv"
+)
+
+# Replace empty strings with NA
+nov_jan[nov_jan == ""] <- NA
+
+# Remove the first column
+nov_jan <- nov_jan[, -1]
+
+# Format and rename variables
+nov_jan <- nov_jan |> 
+  mutate(date = dmy_hm(date)) |> 
+  select(-original_burn_year, -latitude_N, -longitude_E) |> 
+  rename(
+    bulk_nr_thickness = bulk_nr_leaf_thickness,
+    wet_mass = wet_mass_mean,
+    dry_mass = dry_mass_mean,
+    SLA = sla,
+    LDMC = ldmc,
+    envelope_ID = envelopeID,
+    height_flower = height_s_flower,
+    height_vegetative = height_s_top,
+    unique_plantID = unique_plant_id,
+    leaf_area = leaf_area_mean
+  ) |> 
+  mutate(
+    source_file = NA_character_,
+    scanning = NA_character_
+  )
+
+# Calculate mean leaf thickness for the original dataset
+data <- data |> 
+  mutate(
+    across(
+      c(
+        leaf_thickness_1_mm,
+        leaf_thickness_2_mm,
+        leaf_thickness_3_mm
+      ),
+      as.numeric
+    ),
+    leaf_thickness_mean = rowMeans(
+      pick(
+        leaf_thickness_1_mm,
+        leaf_thickness_2_mm,
+        leaf_thickness_3_mm
+      ),
+      na.rm = TRUE
+    ),
+    leaf_thickness_mean = ifelse(is.nan(leaf_thickness_mean), NA, leaf_thickness_mean)
+  )
+
+# Keep only the columns present in the reference dataset
+nov_jan <- nov_jan[, names(data)]
+
+# Convert factors to characters in both datasets
+data <- data |> 
+  mutate(across(where(is.factor), as.character))
+
+nov_jan <- nov_jan |> 
+  mutate(across(where(is.factor), as.character))
+
+# Match the type of each column in nov_jan to the corresponding column in data
+for (v in names(data)) {
+
+  target_class <- class(data[[v]])[1]
+
+  nov_jan[[v]] <- switch(
+    target_class,
+
+    character = as.character(nov_jan[[v]]),
+
+    numeric = suppressWarnings(as.numeric(nov_jan[[v]])),
+
+    double = suppressWarnings(as.numeric(nov_jan[[v]])),
+
+    integer = suppressWarnings(as.integer(nov_jan[[v]])),
+
+    logical = as.logical(nov_jan[[v]]),
+
+    Date = as.Date(nov_jan[[v]]),
+
+    POSIXct = as.POSIXct(nov_jan[[v]]),
+
+    nov_jan[[v]]
+  )
+}
+
+# Merge the datasets
+data <- bind_rows(data, nov_jan)
+```
+
+```{r}
+#| label: create-new-leaf_age-column
+
+data <- data |> 
+  mutate(
+    leaf_age_2 = case_when(
+      month == "May" & leaf_age == "young" ~ 1,
+      month == "July" ~ 3,
+      month == "September" ~ 5,
+      month == "November" ~ 7,
+      month == "January" ~ 9,
+      month == "March" ~ 11,
+      month == "May" & leaf_age == "old" ~ 13,
+      TRUE ~ NA_real_
+    )
+  )
+
+```
+
 # Saving clean dataset
 
 ```{r}
@@ -1164,8 +1318,8 @@ unique(data_filtered$month) |>
 
 
 write.csv2(
-  data, 
-  file = "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/Analyse statistique/thermotolerance/data/clean_data/Seasonal Calluna Thermal Tolerance and Plant Functional Traits.csv", 
+  data,
+  file = "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/Analyse statistique/thermotolerance/data/clean_data/Seasonal Calluna Thermal Tolerance and Plant Functional Traits.csv",
   row.names = FALSE
 )
 

@@ -9,7 +9,7 @@ editor: visual
 
 ```{r}
 # Load libraries
-devtools::install_github("richardjtelford/LeafArea")
+#devtools::install_github("richardjtelford/LeafArea")
 library(LeafArea)
 library(plyr)
 library(dplyr)
@@ -31,13 +31,13 @@ loop.files <-  function(files) {
     try(run.ij(
       path.imagej = "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/ImageJ",
       set.directory = new.folder,
-      distance.pixel = 118, #118 for small, 237 for big
+      distance.pixel = 474, #237 
       known.distance = 2,
       log = TRUE,
       low.size = 0.01,
       trim.pixel = 100,
-      trim.pixel.right = 60, #60 if small file ; 250 if big file
-      trim.pixel.top = 1500, #1500 if small file ; 3000 if big file
+      trim.pixel.right = 120, #60 
+      trim.pixel.top = 3000, #1500
       save.image = TRUE
     ))
   if (inherits(area, "try-error")) {
@@ -54,19 +54,19 @@ loop.files <-  function(files) {
 }
 
 
-# If required
-# test run.ij on a subfolder.
-run.ij(
-  path.imagej = "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/ImageJ",
-  set.directory = "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/scans/calluna_may2026_test/",
-  distance.pixel = 118,
-  known.distance = 2,
-  log = TRUE,
-  low.size = 0.05,
-  trim.pixel = 60,
-  trim.pixel.top = 1500,
-  save.image = TRUE
-)
+# # If required
+# # test run.ij on a subfolder.
+# run.ij(
+#   path.imagej = "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/ImageJ",
+#   set.directory = "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/scans/calluna_july2026/test/",
+#   distance.pixel = 118,
+#   known.distance = 2,
+#   log = TRUE,
+#   low.size = 0.05,
+#   trim.pixel = 60,
+#   trim.pixel.top = 1500,
+#   save.image = TRUE
+# )
 ```
 
 # Calculate Lygra Thermal Tolerance Leaf Scans
@@ -83,11 +83,11 @@ run.ij(
 # A default address could be 'raw_data/leaf_scans/DURIN_leaf_scans/
 
 # The folder with the scan images
-list.of.files <- dir(path = paste0("C:/Users/poula/Documents/M2_PAMEQ/Stage M2/scans/calluna_may2026/edited_images/"), pattern = "jpeg|jpg", recursive = TRUE, full.names = TRUE)
+list.of.files <- dir(path = paste0("C:/Users/poula/Documents/M2_PAMEQ/Stage M2/scans/calluna_march2026/large_size/edited_images/"), pattern = "jpeg|jpg", recursive = TRUE, full.names = TRUE)
 # A default Temp folder that can be created as it's processing
-new.folder <- "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/scans/calluna_may2026/edited_images/Temp"
+new.folder <- "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/scans/calluna_march2026/large_size/Temp"
 # Where you want the thresholded images to be saved, and also the output csv
-output.folder <- "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/scans/calluna_may2026/edited_images/output_edited_images/" 
+output.folder <- "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/scans/calluna_march2026/large_size/output_edited_images_large/" 
 
 # Run function
 # Returns a dataframe with each particle and it's area, using a concatenated ID
@@ -106,5 +106,5 @@ leaf_area <- LeafArea.raw_total |>
 
 # save data as csv
 dim(leaf_area) # check you have the correct number of rows to match input images
-write.csv(leaf_area, file = "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/scans/calluna_may2026/edited_images/output_edited_images/DURIN_Calluna_leaf_area_may_edited_images_2026.csv")
+write.csv(leaf_area, file = "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/scans/calluna_march2026/large_size/output_edited_images_large/DURIN_Calluna_leaf_area_march_edited_large_2026.csv")
 ```

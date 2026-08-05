@@ -8,36 +8,755 @@ editor: visual
 ## Import data
 
 ```{r}
+#| label: setup
+#| message: false 
 
-TTHot_wide_plant <- read.csv2("C:/Users/poula/Documents/M2_PAMEQ/Stage M2/Analyse statistique/thermotolerance/data/clean_data/TTHot_wide_plant.csv")
+# installing / loading packages
+library(readxl) # Enables excel file import
+library(tidyverse) # Contains many helpful packages, i.e. dplyr etc.
+library(janitor) # Has tools for data cleaning 
+library(lubridate) # Date and time formatting
+library(readr) # Data importation functions
+library(stringr) # String and character text
+library(future) # Using severals cores at the same time
+library(ggcorrplot)
+library(emmeans)
+library(car) # for the Anova
+library(dplyr)
+library(performance)
+library(future)
+library(corrplot)
+library(FactoMineR)
+library(factoextra)
+library(nlme) 
+library(lmerTest)
+```
+
+```{r}
+#| label: Create-T50-dataset-May-old-young
+
+TTHot_wide_plant <- read.csv2("C:/Users/poula/Documents/M2_PAMEQ/Stage M2/Analyse statistique/thermotolerance/data/clean_data/TTHot_wide_plant_clean.csv")
+
+TTHot_wide_old_young <- TTHot_wide_plant |>
+  filter(month == "May")
+```
+
+```{r}
+#| label: Create-traits-dataset-May-old-young
+
+data <- read.csv2("C:/Users/poula/Documents/M2_PAMEQ/Stage M2/Analyse statistique/thermotolerance/data/clean_data/Seasonal Calluna Thermal Tolerance and Plant Functional Traits.csv")
+
+
+data <- data |>
+  filter(
+    proj_2025 == "Traits"
+  )
 ```
 
 ## Effect of leaf age on T50 (Hot tolerance)
 
 ```{r}
-#| label: Create-data-May-old-young
+#| label: check-performance-models
 
-TTHot_wide_old_young <- TTHot_wide_plant |>
-  filter(month %in% c("May")) |>
-  filter(metric %in% c("T50"))
+modele_lm_1 <- lm(estimate ~ leaf_age, data = TTHot_wide_old_young)
+modele_lm_2 <- lm(estimate ~ leaf_age * age_class, data = TTHot_wide_old_young)
+modele_lm_3 <- lm(estimate ~ leaf_age + age_class, data = TTHot_wide_old_young)
+
+AIC(modele_lm_1, modele_lm_2)
+AIC(modele_lm_1, modele_lm_3)
+AIC(modele_lm_2, modele_lm_3)
+
+anova(modele_lm_1, modele_lm_2)
+anova(modele_lm_1, modele_lm_3)
+anova(modele_lm_2, modele_lm_3)
+summary(modele_lm_1)$adj.r.squared
+summary(modele_lm_2)$adj.r.squared
+summary(modele_lm_3)$adj.r.squared
+
+# The model to keep is model_lm_1:
+# - Lowest AIC (126.7 vs. 132.1 for m3 and 134.1 for m2)
+# - Neither age_class (p = 0.920) nor its interaction with leaf_age (p = 0.758) are significant
+# - Adding parameters overfits and degrades model parsimony
+
 ```
 
 ```{r}
 #| label: LM-May-old-young
 #| fig-height: 10
 
-modele_lm_2 <- lm(estimate ~ leaf_age * age_class, data = TTHot_wide_old_young)
-performance::check_model(modele_lm_2)
+modele_lm_1 <- lm(estimate ~ leaf_age, data = TTHot_wide_old_young)
+performance::check_model(modele_lm_1)
 
-summary(modele_lm_2)
+summary(modele_lm_1)
 
-print(Anova(modele_lm_2, type = "II"))
+print(Anova(modele_lm_1, type = "II"))
 
-emmeans(modele_lm_2, ~ leaf_age)
-pairs(emmeans(modele_lm_2, ~ leaf_age))
+emmeans(modele_lm_1, ~ leaf_age)
+pairs(emmeans(modele_lm_1, ~ leaf_age))
 
+# A one-way ANOVA revealed no significant effect of leaf age on the measured variable (F{1, 22} = 0.003, p = 0.958, adjusted R^2 = -0.045). Estimated marginal means were virtually identical between old leaves (45.8 \pm 0.94) and young leaves (45.8 \pm 0.87), with a negligible mean difference of 0.068 units (SE = 1.28, t = 0.053, p = 0.958). Overall, leaf age accounts for none of the variance in the response of T50.
+# Residuals showed satisfactory normality on the Q-Q plot and homogenous variance across groups (SE_{old} = 0.941, SE_{young} = 0.866).
 ```
 
 ```{r}
 #| label: figure-young-old
+
+
+p <- ggplot(TTHot_wide_old_young,
+       aes(x = leaf_age, y = estimate, fill = leaf_age)) +
+
+  geom_violin(
+  trim = FALSE,
+  adjust = 1.8,
+  alpha = 0.35,
+  colour = NA
+) +
+
+  geom_boxplot(
+  aes(fill = leaf_age),
+  width = 0.18,
+  alpha = 0.7,      
+  colour = "black",
+  outlier.shape = NA,
+  staplewidth = 0.5
+)+
+
+  geom_jitter(width = 0.08,
+              size = 2.8,
+              shape = 21,
+              colour = "black",
+              alpha = 0.8) +
+
+  scale_fill_manual(values = c("old" = "#4C78A8",
+                               "young" = "#F58518")) +
+
+  labs(title = "Effect of leaf age on T50 of Fv/Fm",
+       subtitle = "F(1, 22) = 0.003, p = 0.958 (No significant effect)",
+       x = "Leaf age",
+       y = "T50 of Fv/Fm (C°)") +
+
+  theme_classic(base_size = 15) +
+  theme(
+    legend.position = "none",
+    plot.title = element_text(face = "bold"),
+    plot.margin = margin(20, 20, 20, 20)
+  )
+
+print(p)
+
+ggsave(
+  filename = "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/Figures/leaf_age effect on T50.png",
+  plot = p,                             
+  width = 10,                           
+  height = 7,                           
+  units = "in",                         
+  dpi = 300                             
+)
+```
+
+## Effect of leaf age on traits (Hot tolerance)
+
+```{r}
+#| label: traits-colinearity
+
+cor_matrix <- traits_old_young |> 
+  select(SLA, LDMC, leaf_area, height_vegetative, height_flower) |> 
+  cor(use = "pairwise.complete.obs")
+
+corrplot(
+  cor_matrix, 
+  method = "color", 
+  type = "lower", 
+  addCoef.col = "black", 
+  tl.col = "black",     
+  tl.srt = 45,           
+  diag = FALSE
+)
+
+# height_vegetative and height_flower (0.97) are highly correlated, so height_flower is removed as this experiment focuses on leaves rather than flowers.
+
+```
+
+```{r}
+#| label: leaf_age-and-leaf_area
+
+modele_lm_1 <- lm(leaf_area ~ leaf_age, data = traits_old_young)
+modele_lm_2 <- lm(leaf_area ~ leaf_age * age_class, data = traits_old_young)
+modele_lm_3 <- lm(leaf_area ~ leaf_age + age_class, data = traits_old_young)
+
+AIC(modele_lm_1, modele_lm_2)
+AIC(modele_lm_1, modele_lm_3)
+AIC(modele_lm_2, modele_lm_3)
+
+anova(modele_lm_1, modele_lm_2)
+anova(modele_lm_1, modele_lm_3)
+anova(modele_lm_2, modele_lm_3)
+summary(modele_lm_1)$adj.r.squared
+summary(modele_lm_2)$adj.r.squared
+summary(modele_lm_3)$adj.r.squared
+
+# The model to keep is model_lm_3:
+# - Lowest AIC (-511.7 vs. -507.4 for m2)
+# - The leaf_age:age_class interaction is not significant (p = 0.652)
+# - Highest adjusted R² (0.528)
+
+```
+
+```{r}
+#| label: leaf_age-and-leaf_area-model
+#| fig-height: 10
+
+modele_lm_3 <- lm(leaf_area ~ leaf_age + age_class, data = traits_old_young)
+performance::check_model(modele_lm_3)
+
+summary(modele_lm_3)
+
+print(Anova(modele_lm_3, type = "II"))
+
+emmeans(modele_lm_3, ~ leaf_age)
+emmeans(modele_lm_3, ~ age_class)
+
+
+pairs(emmeans(modele_lm_3, ~ leaf_age))
+pairs(emmeans(modele_lm_3, ~ age_class))
+
+# The additive linear model revealed significant effects of both leaf age (Type II ANOVA: F_{1,287} = 49.63, p < 0.001) and plant age class (F_{3,287} = 88.49, p < 0.001) on leaf area, explaining 52.8\% of the total variance (Adjusted R^2 = 0.5284). Averaged across plant age classes, old leaves had a significantly greater leaf area than young leaves (estimated marginal means: 0.358 \pm 0.008 vs. 0.275 \pm 0.008). Averaged across leaf ages, leaf area was highest in the Newly Burnt age class (0.479 \pm 0.012), whereas Building (0.250 \pm 0.013) and Mature (0.248 \pm 0.012) did not differ significantly (p = 1.000). Model diagnostics confirmed satisfactory linearity, homoscedasticity, low collinearity (\text{VIF} < 5), and normal residual distribution without influential outliers.
+```
+
+```{r}
+#| label: SLA-and-leaf_area
+
+modele_lm_1 <- lm(SLA ~ leaf_age, data = traits_old_young)
+modele_lm_2 <- lm(SLA ~ leaf_age * age_class, data = traits_old_young)
+modele_lm_3 <- lm(SLA ~ leaf_age + age_class, data = traits_old_young)
+
+AIC(modele_lm_1, modele_lm_2)
+AIC(modele_lm_1, modele_lm_3)
+AIC(modele_lm_2, modele_lm_3)
+
+anova(modele_lm_1, modele_lm_2)
+anova(modele_lm_1, modele_lm_3)
+anova(modele_lm_2, modele_lm_3)
+summary(modele_lm_1)$adj.r.squared
+summary(modele_lm_2)$adj.r.squared
+summary(modele_lm_3)$adj.r.squared
+
+# The model to keep is model_lm_3:
+# - The leaf_age:age_class interaction is not statistically significant (p = 0.104)
+# - Delta AIC between m2 and m3 is negligible (< 2, AIC = 3126.0 vs. 3125.7)
+# - Model m3 is preferred for parsimony and higher adjusted R² efficiency (30.7%)
+```
+
+```{r}
+#| label: SLA-and-leaf_area
+#| fig-height: 10
+
+
+modele_lm_3 <- lm(SLA ~ leaf_age + age_class, data = traits_old_young)
+performance::check_model(modele_lm_3)
+
+summary(modele_lm_3)
+
+print(Anova(modele_lm_3, type = "II"))
+
+emmeans(modele_lm_3, ~ leaf_age)
+emmeans(modele_lm_3, ~ age_class)
+
+
+pairs(emmeans(modele_lm_3, ~ leaf_age))
+pairs(emmeans(modele_lm_3, ~ age_class))
+
+# The additive linear model revealed a significant effect of plant age class on SLA (Type II ANOVA: F_{3,287} = 44.26, p < 0.001), explaining 30.7\% of the total variance (Adjusted R^2 = 0.3068), whereas leaf age had no significant effect (F_{1,287} = 0.69, p = 0.406). Averaged across plant age classes, SLA was nearly identical between old and young leaves (estimated marginal means: 252 \pm 4.23 vs. 256 \pm 4.16). Averaged across leaf ages, SLA was highest in the Newly Burnt age class (310 \pm 5.88), whereas Mature and Pioneer did not differ significantly (p = 0.754). Model diagnostics confirmed satisfactory linearity, homoscedasticity, low collinearity (\text{VIF} < 5), and independence with no influential outliers.
+```
+
+```{r}
+#| label: LDMC-and-leaf_area
+
+modele_lm_1 <- lm(LDMC ~ leaf_age, data = traits_old_young)
+modele_lm_2 <- lm(LDMC ~ leaf_age * age_class, data = traits_old_young)
+modele_lm_3 <- lm(LDMC ~ leaf_age + age_class, data = traits_old_young)
+
+AIC(modele_lm_1, modele_lm_2)
+AIC(modele_lm_1, modele_lm_3)
+AIC(modele_lm_2, modele_lm_3)
+
+anova(modele_lm_1, modele_lm_2)
+anova(modele_lm_1, modele_lm_3)
+anova(modele_lm_2, modele_lm_3)
+summary(modele_lm_1)$adj.r.squared
+summary(modele_lm_2)$adj.r.squared
+summary(modele_lm_3)$adj.r.squared
+
+# The model to keep is model_lm_3:
+# - Lowest AIC (-573.7 vs. -569.9 for m2 and -542.7 for m1)
+# - The leaf_age:age_class interaction is not significant (F = 0.702, p = 0.552)
+# - Highest adjusted R² (0.256 vs. 0.253 for m2 and 0.164 for m1)
+```
+
+```{r}
+#| label: LDMC-and-leaf_area
+#| fig-height: 10
+
+
+modele_lm_3 <- lm(LDMC ~ leaf_age + age_class, data = traits_old_young)
+performance::check_model(modele_lm_3)
+
+summary(modele_lm_3)
+
+print(Anova(modele_lm_3, type = "II"))
+
+emmeans(modele_lm_3, ~ leaf_age)
+emmeans(modele_lm_3, ~ age_class)
+
+
+pairs(emmeans(modele_lm_3, ~ leaf_age))
+pairs(emmeans(modele_lm_3, ~ age_class))
+
+# The additive linear model revealed significant effects of both leaf age (Type II ANOVA: F_{1,287} = 71.24, p < 0.001) and plant age class (F_{3,287} = 12.93, p < 0.001) on LDMC, explaining 25.6\% of the total variance (Adjusted R^2 = 0.2555). Averaged across plant age classes, old leaves had a significantly higher LDMC than young leaves (estimated marginal means: 0.485 \pm 0.007 vs. 0.396 \pm 0.007). Averaged across leaf ages, LDMC was highest in the Building (0.472 \pm 0.011) and Mature (0.471 \pm 0.010) age classes, which did not differ significantly (p = 1.000), whereas Newly Burnt exhibited the lowest values (0.394 \pm 0.010). Model diagnostics confirmed satisfactory linearity, homoscedasticity, low collinearity (\text{VIF} < 5), and normal residual distribution without influential outliers.
+```
+
+```{r}
+#| label: height_vegetative-and-leaf_area
+
+modele_lm_1 <- lm(height_vegetative ~ leaf_age, data = traits_old_young)
+modele_lm_2 <- lm(height_vegetative ~ leaf_age * age_class, data = traits_old_young)
+modele_lm_3 <- lm(height_vegetative ~ leaf_age + age_class, data = traits_old_young)
+
+AIC(modele_lm_1, modele_lm_2)
+AIC(modele_lm_1, modele_lm_3)
+AIC(modele_lm_2, modele_lm_3)
+
+anova(modele_lm_1, modele_lm_2)
+anova(modele_lm_1, modele_lm_3)
+anova(modele_lm_2, modele_lm_3)
+summary(modele_lm_1)$adj.r.squared
+summary(modele_lm_2)$adj.r.squared
+summary(modele_lm_3)$adj.r.squared
+
+# The model to keep is model_lm_3:
+# - Lowest AIC (1832.8 vs. 1838.5 for m2 and 2360.1 for m1)
+# - The leaf_age:age_class interaction is not significant (F = 0.083, p = 0.969)
+# - Highest adjusted R² (0.816 vs. 0.814 for m2 and -0.002 for m1)
+```
+
+```{r}
+#| label: height_vegetative-and-leaf_area
+#| fig-height: 10
+
+
+modele_lm_3 <- lm(height_vegetative ~ leaf_age + age_class, data = traits_old_young)
+performance::check_model(modele_lm_3)
+
+summary(modele_lm_3)
+
+print(Anova(modele_lm_3, type = "II"))
+
+emmeans(modele_lm_3, ~ leaf_age)
+emmeans(modele_lm_3, ~ age_class)
+
+
+pairs(emmeans(modele_lm_3, ~ leaf_age))
+pairs(emmeans(modele_lm_3, ~ age_class))
+
+# The additive linear model revealed a highly significant effect of plant age class (Type II ANOVA: F_{3,308} = 461.59, p < 0.001) on vegetative height, explaining 81.6\% of the total variance (Adjusted R^2 = 0.8159), whereas leaf age had no significant effect (F_{1,308} = 0.067, p = 0.796). Averaged across plant age classes, vegetative height was virtually identical between old and young leaves (estimated marginal means: 22.0 \pm 0.355 vs. 22.1 \pm 0.361). Averaged across leaf ages, vegetative height significantly differed across all plant age classes (p < 0.0001 for all pairwise Tukey comparisons), reaching its maximum in Mature (34.50 \pm 0.500) and its minimum in Newly Burnt (8.15 \pm 0.520). Model diagnostics confirmed satisfactory linearity, homoscedasticity, low collinearity (\text{VIF} < 5), and normal residual distribution.
+```
+
++-----------------------+------------------------------------+-------------------------------------+-----------------+--------------------------------------------------------------------------------------------------------------------------------------+
+| **Trait**             | **leaf_age Effect**                | **age_class Effect**                | **Adjusted R2** | **Main Trends**                                                                                                                      |
++-----------------------+------------------------------------+-------------------------------------+-----------------+--------------------------------------------------------------------------------------------------------------------------------------+
+| **LDMC**              | **Significant**                    | **Significant**                     | $0.256$         | Old \> Young leaves ($0.485$ vs. $0.396$). Highest for *Building* & *Mature*, lowest for *Newly Burnt*.                              |
+|                       |                                    |                                     |                 |                                                                                                                                      |
+|                       | \                                  | \                                   |                 |                                                                                                                                      |
+|                       |                                    |                                     |                 |                                                                                                                                      |
+|                       | ($F_{1,287} = 71.24$, $p < 0.001$) | ($F_{3,287} = 12.93$, $p < 0.001$)  |                 |                                                                                                                                      |
++-----------------------+------------------------------------+-------------------------------------+-----------------+--------------------------------------------------------------------------------------------------------------------------------------+
+| **Leaf Area**         | **Significant**                    | **Significant**                     | $0.528$         | Old \> Young leaves ($0.358$ vs. $0.275$). Markedly higher in *Newly Burnt* ($0.479$).                                               |
+|                       |                                    |                                     |                 |                                                                                                                                      |
+|                       | \                                  | \                                   |                 |                                                                                                                                      |
+|                       |                                    |                                     |                 |                                                                                                                                      |
+|                       | ($F_{1,287} = 49.63$, $p < 0.001$) | ($F_{3,287} = 88.49$, $p < 0.001$)  |                 |                                                                                                                                      |
++-----------------------+------------------------------------+-------------------------------------+-----------------+--------------------------------------------------------------------------------------------------------------------------------------+
+| **Vegetative Height** | **Non-significant**                | **Significant**                     | $0.816$         | Independent of leaf age (\~$22.0$ cm). Significant differences across all classes: **Mature \> Pioneer \> Building \> Newly Burnt**. |
+|                       |                                    |                                     |                 |                                                                                                                                      |
+|                       | \                                  | \                                   |                 |                                                                                                                                      |
+|                       |                                    |                                     |                 |                                                                                                                                      |
+|                       | ($F_{1,308} = 0.067$, $p = 0.796$) | ($F_{3,308} = 461.59$, $p < 0.001$) |                 |                                                                                                                                      |
++-----------------------+------------------------------------+-------------------------------------+-----------------+--------------------------------------------------------------------------------------------------------------------------------------+
+| **SLA**               | **Non-significant**                | **Significant**                     | $0.307$         | Independent of leaf age (\~$254$). Highest for *Newly Burnt* ($310$), *Mature* & *Pioneer* are similar.                              |
+|                       |                                    |                                     |                 |                                                                                                                                      |
+|                       | \                                  | \                                   |                 |                                                                                                                                      |
+|                       |                                    |                                     |                 |                                                                                                                                      |
+|                       | ($F_{1,287} = 0.69$, $p = 0.406$)  | ($F_{3,287} = 44.26$, $p < 0.001$)  |                 |                                                                                                                                      |
++-----------------------+------------------------------------+-------------------------------------+-----------------+--------------------------------------------------------------------------------------------------------------------------------------+
+
+# New : effect of leaf_age_2 on traits
+
+## Import data
+
+```{r}
+#| label: Create-traits-dataset-May-old-young
+
+data <- read.csv2("C:/Users/poula/Documents/M2_PAMEQ/Stage M2/Analyse statistique/thermotolerance/data/clean_data/Seasonal Calluna Thermal Tolerance and Plant Functional Traits.csv")
+
+
+data <- data |>
+  filter(
+    proj_2025 == "Traits"
+  )
+```
+
+## Traits colinearity
+
+```{r}
+#| label: traits-colinearity
+
+cor_matrix <- data |> 
+  select(SLA, LDMC, leaf_area, height_vegetative, height_flower,leaf_thickness_mean) |> 
+  cor(use = "pairwise.complete.obs")
+
+corrplot(
+  cor_matrix, 
+  method = "color", 
+  type = "lower", 
+  addCoef.col = "black", 
+  tl.col = "black",     
+  tl.srt = 45,           
+  diag = FALSE
+)
+
+# height_vegetative and height_flower (0.91) are highly correlated, so height_flower is removed as this experiment focuses on leaves rather than flowers.
+
+```
+
+## Traits variations across leaf age and age class
+
+```{r}
+#| label: plots
+#| warning: false
+
+traits <- data |> 
+  select(
+    leaf_age_2,
+    age_class,        
+    leaf_area,
+    leaf_thickness_mean,
+    SLA,
+    LDMC,
+    height_vegetative
+  ) |> 
+  mutate(
+    age_class = factor(
+      age_class, 
+      levels = c("Newly Burnt", "Pioneer", "Building", "Mature") ))|> 
+  pivot_longer(
+    cols = -c(leaf_age_2, age_class),
+    names_to = "trait",
+    values_to = "value"
+  )
+
+ggplot(traits, aes(x = leaf_age_2, y = value, colour = age_class, group = age_class)) +
+
+  geom_point(alpha = 0.3, size = 1.5) +
+
+  stat_summary(
+    fun = mean,
+    geom = "line",
+    linewidth = 1
+  ) +
+  
+  stat_summary(
+    fun = mean,
+    geom = "point",
+    size = 3
+  ) +
+
+  facet_wrap(~trait, scales = "free_y", ncol = 3,
+             labeller = as_labeller(c(
+    "height_vegetative"   = "Vegetative height (cm)",
+    "LDMC"                = "LDMC (g/g)",
+    "leaf_area"           = "Leaf area (cm²)",
+    "leaf_thickness_mean" = "Leaf thickness (mm)",
+    "SLA"                 = "SLA (cm²/g)"
+  ))) +
+
+  scale_x_continuous(
+    breaks = c(1, 3, 5, 7, 9, 11, 13),
+    labels = c(
+      "1\nMay\n(Y)",
+      "3\nJul",
+      "5\nSep",
+      "7\nNov",
+      "9\nJan",
+      "11\nMar",
+      "13\nMay\n(O)"
+    )
+  ) +
+
+  labs(
+    x = NULL,
+    y = NULL,
+    colour = "Age class"
+  ) +
+
+  theme_bw()
+
+```
+
+## Leaf condition (March and May)
+
+```{r}
+#| label: brown-leaves-March
+#| warning: false
+
+data |> 
+  filter(month == "March", proj_2025 == "Traits") |> 
+  pivot_longer(
+    cols = c(LDMC, SLA, wet_mass, leaf_area, dry_mass),
+    names_to = "trait",
+    values_to = "value"
+  ) |> 
+  mutate(
+    trait_label = factor(
+      case_when(
+        trait == "dry_mass"  ~ "Dry Mass (g)",
+        trait == "wet_mass"  ~ "Wet Mass (g)",
+        trait == "leaf_area" ~ "Leaf Area (cm²)",
+        trait == "LDMC"      ~ "LDMC (g/g)",
+        trait == "SLA"       ~ "SLA (cm²/g)",
+        TRUE ~ trait
+      ),
+      levels = c("LDMC (g/g)", "SLA (cm²/g)", "Wet Mass (g)", "Leaf Area (cm²)", "Dry Mass (g)")
+    ),
+    color_group = case_when(
+      grepl("brown", scanning, ignore.case = TRUE) ~ "Brown leaf",
+      TRUE ~ "Green leaf"
+    ),
+    age_class_ordered = factor(age_class, levels = c("Newly Burnt", "Pioneer", "Building", "Mature"))
+  ) |> 
+  ggplot(
+    aes(
+      x = age_class_ordered, 
+      y = value, 
+      color = color_group
+    )
+  ) +
+  geom_point(
+    aes(group = color_group), 
+    size = 2, 
+    alpha = 0.8, 
+    position = position_jitterdodge(
+      jitter.width = 0.25, 
+      dodge.width  = 0.75
+    )
+  ) +
+  facet_wrap(~ trait_label, scales = "free_y") +
+  
+  scale_color_manual(
+    name = "Leaf condition",
+    values = c(
+      "Brown leaf" = "#8B4513",
+      "Green leaf" = "#2E8B57"
+    )
+  ) +
+  
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(
+    x = "Age class",
+    y = NULL,
+    title = "Trait Values across Age Classes (March)"
+  )
+```
+
+```{r}
+#| label: brown-leaves-May
+#| warning: false
+
+data |> 
+  filter(month == "May", proj_2025 == "Traits") |> 
+  pivot_longer(
+    cols = c(LDMC, SLA, wet_mass, leaf_area, dry_mass),
+    names_to = "trait",
+    values_to = "value"
+  ) |> 
+  mutate(
+    trait_label = factor(
+      case_when(
+        trait == "dry_mass"  ~ "Dry Mass (g)",
+        trait == "wet_mass"  ~ "Wet Mass (g)",
+        trait == "leaf_area" ~ "Leaf Area (cm²)",
+        trait == "LDMC"      ~ "LDMC (g/g)",
+        trait == "SLA"       ~ "SLA (cm²/g)",
+        TRUE ~ trait
+      ),
+      levels = c("LDMC (g/g)", "SLA (cm²/g)", "Wet Mass (g)", "Leaf Area (cm²)", "Dry Mass (g)")
+    ),
+    color_group = case_when(
+      grepl("brown", scanning, ignore.case = TRUE) ~ "Brown leaf",
+      TRUE ~ "Green leaf"
+    ),
+    age_class_ordered = factor(age_class, levels = c("Newly Burnt", "Pioneer", "Building", "Mature"))
+  ) |> 
+  ggplot(
+    aes(
+      x = age_class_ordered, 
+      y = value, 
+      color = color_group,
+      shape = leaf_age
+    )
+  ) +
+  geom_point(
+    aes(group = color_group), 
+    size = 2.5, 
+    alpha = 0.8, 
+    position = position_jitterdodge(
+      jitter.width = 0.25, 
+      dodge.width  = 0.75
+    )
+  ) +
+  facet_wrap(~ trait_label, scales = "free_y") +
+  
+  scale_color_manual(
+    name = "Leaf condition",
+    values = c(
+      "Brown leaf" = "#8B4513",
+      "Green leaf" = "#2E8B57"
+    )
+  ) +
+  
+  scale_shape_manual(
+    name = "Leaf age",
+    values = c(
+      "young" = 16,
+      "old"   = 17
+    )
+  ) +
+  
+  theme_bw() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.box = "vertical"
+  ) +
+  labs(
+    x = "Age class",
+    y = NULL,
+    title = "Trait Values across Age Classes (May)"
+  )
+```
+
+## Traits PCA
+
+```{r}
+#| label: PCA-data
+#| warning: false
+
+# Data Preparation with Clean Variable Names
+pca_data <- data |> 
+  select(
+    leaf_age_2,
+    age_class,        
+    `Leaf Area`            = leaf_area,
+    `Mean Leaf Thickness` = leaf_thickness_mean,
+    SLA,
+    LDMC,
+    `Vegetative Height`   = height_vegetative
+  ) |> 
+  mutate(
+    age_class = factor(age_class, levels = c("Newly Burnt", "Pioneer", "Building", "Mature"))
+  )
+
+# Run PCA
+var_names <- c("LDMC", "SLA", "Leaf Area", "Mean Leaf Thickness", "Vegetative Height")
+res_pca   <- PCA(pca_data[, var_names], scale.unit = TRUE, graph = FALSE)
+
+# Extract Individual Coordinates
+pca_coords <- fviz_pca_ind(res_pca, graph = FALSE)$data
+pca_coords$age_class       <- pca_data$age_class
+pca_coords$leaf_age_factor <- as.factor(pca_data$leaf_age_2)
+
+# Custom Green Palette
+green_palette <- c(
+  "1"  = "#74c476",
+  "3"  = "#41ab5d",
+  "5"  = "#238b45",
+  "7"  = "#006d2c",
+  "9"  = "#00441b",
+  "11" = "#002d12",
+  "13" = "#001a0a"
+)
+```
+
+```{r}
+#| label: PCA-overall-temporal-gradient 
+#| warning: false
+
+ggplot(pca_coords, aes(x = x, y = y, colour = leaf_age_factor, shape = age_class)) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "gray50") +
+  
+  geom_point(size = 3, alpha = 0.8) +
+  scale_shape_manual(values = c(16, 17, 15, 18)) +
+  scale_color_manual(values = green_palette, name = "Leaf Age") +
+  
+  labs(
+    x = paste0("Dim1 (", round(res_pca$eig[1, 2], 1), "%)"),
+    y = paste0("Dim2 (", round(res_pca$eig[2, 2], 1), "%)"),
+    shape = "Age Class",
+    title = "PCA Individuals - Gradient of Leaf Age"
+  ) +
+  theme_minimal()
+```
+
+```{r}
+#| label: PCA-facetted-by-Age-Class 
+#| warning: false
+
+ggplot(pca_coords, aes(x = x, y = y, colour = leaf_age_factor)) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "gray50") +
+  
+  geom_point(size = 2.5, alpha = 0.8) +
+  scale_color_manual(values = green_palette, name = "Leaf Age") +
+  
+  facet_wrap(~age_class, ncol = 2) +
+  
+  labs(
+    x = paste0("Dim1 (", round(res_pca$eig[1, 2], 1), "%)"),
+    y = paste0("Dim2 (", round(res_pca$eig[2, 2], 1), "%)"),
+    title = "PCA Individuals - Facetted by Age Class"
+  ) +
+  theme_bw()
+```
+
+```{r}
+#| label: PCA-variables-circles
+#| warning: false
+
+fviz_pca_var(
+  res_pca,
+  col.var = "contrib", 
+  gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+  repel = TRUE
+) +
+  labs(
+    title = "Variables - PCA",
+    x = paste0("Dim1 (", round(res_pca$eig[1, 2], 1), "%)"),
+    y = paste0("Dim2 (", round(res_pca$eig[2, 2], 1), "%)"),
+    color = "Contrib"
+  ) +
+  theme_minimal()
+```
+
+```{r}
+#| label: Saving-PCA-dim
+
+# Extract individual scores for Dim1 and Dim2
+pca_scores <- res_pca$ind$coord[, c("Dim.1", "Dim.2")]
+colnames(pca_scores) <- c("PCA1_score", "PCA2_score")
+
+# Merge scores with your cleaned dataset
+pca_dim <- cbind(pca_data, pca_scores)
+
+# Save the dataframe to your working directory
+saveRDS(pca_dim, file = "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/Analyse statistique/thermotolerance/data/clean_data/pca_dim.rds")
 ```

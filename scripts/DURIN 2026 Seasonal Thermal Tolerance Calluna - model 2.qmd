@@ -8,7 +8,30 @@ editor: visual
 # Import data
 
 ```{r}
-TTHot_wide_plant <- read.csv2("C:/Users/poula/Documents/M2_PAMEQ/Stage M2/Analyse statistique/thermotolerance/data/clean_data/TTHot_wide_plant.csv")
+#| label: setup
+#| message: false 
+
+# installing / loading packages
+library(readxl) # Enables excel file import
+library(tidyverse) # Contains many helpful packages, i.e. dplyr etc.
+library(janitor) # Has tools for data cleaning 
+library(lubridate) # Date and time formatting
+library(readr) # Data importation functions
+library(stringr) # String and character text
+library(future) # Using severals cores at the same time
+library(ggcorrplot)
+library(emmeans)
+library(car) # for the Anova
+library(dplyr)
+# install.packages("remotes")
+# remotes::install_github("richardjtelford/thermalTolerance")
+library(thermalTolerance)
+
+library(future)
+```
+
+```{r}
+TTHot_wide_plant <- read.csv2("C:/Users/poula/Documents/M2_PAMEQ/Stage M2/Analyse statistique/thermotolerance/data/clean_data/TTHot_wide_plant_clean.csv")
 ```
 
 # Effect of age classe, season and their interaction on T50
@@ -22,8 +45,7 @@ TTHot_wide_plant <- read.csv2("C:/Users/poula/Documents/M2_PAMEQ/Stage M2/Analys
 
 TTHot_wide_NB_PIO_old <- TTHot_wide_plant |>
   filter(age_class %in% c("Newly Burnt", "Pioneer")) |>
-  filter(leaf_age %in% c("old")) |>
-  filter(metric %in% c("T50"))
+  filter(leaf_age %in% c("old"))
 ```
 
 ```{r}
@@ -50,108 +72,108 @@ pairs(emmeans(modele_lm_1, ~ month))
 ```
 
 ```{r}
-#| label: Post-hoc-test-month
-library(emmeans)
-library(multcomp)
-
-comp_mois <- emmeans(modele_lm_1, specs = pairwise ~ month)
-summary(comp_mois$contrasts)
-
-valeurs_mois <- emmeans(modele_lm_1, ~ month)
-
-cld(valeurs_mois, Letters = letters)
+# #| label: Post-hoc-test-month
+# library(emmeans)
+# library(multcomp)
+# 
+# comp_mois <- emmeans(modele_lm_1, specs = pairwise ~ month)
+# summary(comp_mois$contrasts)
+# 
+# valeurs_mois <- emmeans(modele_lm_1, ~ month)
+# 
+# cld(valeurs_mois, Letters = letters)
 ```
 
 ```{r}
-#| label: box-plot-month
-#| warning: false
-library(patchwork)
-
-posthoc_letters <- data.frame(
-  month = c("May", "March"),
-  letter = c("a", "b"),
-  y_pos = c(51.5, 53) 
-)
-
-g1 <- ggplot(TTHot_wide_NB_PIO_old, aes(
-  x = month,
-  y = estimate
-)) +
-  stat_boxplot(geom = "errorbar", width = 0.07, color = "grey30") +
-  geom_boxplot(width = 0.15, alpha = 1, outlier.shape = NA, color = "grey30", fill = "grey95") + 
-  
-  geom_jitter(
-    aes(color = age_class, shape = age_class),
-    width = 0.1, size = 1.5, alpha = 0.8
-  ) + 
-  
-  geom_text(
-    data = posthoc_letters,
-    aes(x = month, y = y_pos, label = letter),
-    inherit.aes = FALSE, size = 5, color = "black"
-  ) +
-  labs(x = "Month", y = "T50 (°C)") + 
-  scale_color_manual(values = c("Newly Burnt" = "#c07df0", "Pioneer" = "#7cb815")) +
-  stat_summary(
-    aes(group = month),
-    fun.data = function(y) { data.frame(y = 39, label = paste0("n = ", length(y))) },
-    geom = "text", color = "grey60", size = 3.2, vjust = 0
-  ) +
-  theme_light() + 
-  theme(
-    legend.position = "none", 
-    panel.grid.minor = element_blank()
-  )
-
-
-g2 <- ggplot(TTHot_wide_NB_PIO_old, aes(
-  x = month,
-  y = estimate,
-  group = age_class
-)) +
-  geom_jitter(
-    aes(color = age_class, shape = age_class),
-    size = 2, alpha = 1, position = position_jitter(width = 0.1, height = 0, seed = 42)
-  ) +
-  stat_summary(
-    aes(linetype = age_class), 
-    fun = mean, geom = "line", color = "black", linewidth = 0.6            
-  ) +
-  labs(
-    x = "Month", 
-    y = "T50 (°C)", 
-    color = "Age Class", 
-    shape = "Age Class", 
-    linetype = "Age Class"
-  ) +
-  stat_summary(
-    aes(group = month),
-    fun.data = function(y) { data.frame(y = 39, label = paste0("n = ", length(y))) },
-    geom = "text", color = "grey60", size = 3.2, vjust = 0
-  ) +
-  scale_color_manual(values = c("Newly Burnt" = "#c07df0", "Pioneer" = "#7cb815")) +
-  guides(
-    color = guide_legend(override.aes = list(size = 3, alpha = 1)),
-    shape = guide_legend(override.aes = list(size = 3)),
-    linetype = guide_legend()
-  ) +
-  theme_light() +
-  theme(
-    legend.position = "right", 
-    panel.grid.minor = element_blank()
-  )
-
-# 4. Assembly and Display
-figure_finale <- g1 + g2 + plot_annotation(tag_levels = 'A')+
-  plot_layout(axes = "collect")
-figure_finale
-
-
-ggsave(
-  filename = "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/Figures/Thermal Tolerance (T50) Evolution by month.png",
-  plot = figure_finale,
-  width = 18, height = 12, units = "cm", dpi = 300
-)
+# #| label: box-plot-month
+# #| warning: false
+# library(patchwork)
+# 
+# posthoc_letters <- data.frame(
+#   month = c("May", "March"),
+#   letter = c("a", "b"),
+#   y_pos = c(51.5, 53) 
+# )
+# 
+# g1 <- ggplot(TTHot_wide_NB_PIO_old, aes(
+#   x = month,
+#   y = estimate
+# )) +
+#   stat_boxplot(geom = "errorbar", width = 0.07, color = "grey30") +
+#   geom_boxplot(width = 0.15, alpha = 1, outlier.shape = NA, color = "grey30", fill = "grey95") + 
+#   
+#   geom_jitter(
+#     aes(color = age_class, shape = age_class),
+#     width = 0.1, size = 1.5, alpha = 0.8
+#   ) + 
+#   
+#   geom_text(
+#     data = posthoc_letters,
+#     aes(x = month, y = y_pos, label = letter),
+#     inherit.aes = FALSE, size = 5, color = "black"
+#   ) +
+#   labs(x = "Month", y = "T50 (°C)") + 
+#   scale_color_manual(values = c("Newly Burnt" = "#c07df0", "Pioneer" = "#7cb815")) +
+#   stat_summary(
+#     aes(group = month),
+#     fun.data = function(y) { data.frame(y = 39, label = paste0("n = ", length(y))) },
+#     geom = "text", color = "grey60", size = 3.2, vjust = 0
+#   ) +
+#   theme_light() + 
+#   theme(
+#     legend.position = "none", 
+#     panel.grid.minor = element_blank()
+#   )
+# 
+# 
+# g2 <- ggplot(TTHot_wide_NB_PIO_old, aes(
+#   x = month,
+#   y = estimate,
+#   group = age_class
+# )) +
+#   geom_jitter(
+#     aes(color = age_class, shape = age_class),
+#     size = 2, alpha = 1, position = position_jitter(width = 0.1, height = 0, seed = 42)
+#   ) +
+#   stat_summary(
+#     aes(linetype = age_class), 
+#     fun = mean, geom = "line", color = "black", linewidth = 0.6            
+#   ) +
+#   labs(
+#     x = "Month", 
+#     y = "T50 (°C)", 
+#     color = "Age Class", 
+#     shape = "Age Class", 
+#     linetype = "Age Class"
+#   ) +
+#   stat_summary(
+#     aes(group = month),
+#     fun.data = function(y) { data.frame(y = 39, label = paste0("n = ", length(y))) },
+#     geom = "text", color = "grey60", size = 3.2, vjust = 0
+#   ) +
+#   scale_color_manual(values = c("Newly Burnt" = "#c07df0", "Pioneer" = "#7cb815")) +
+#   guides(
+#     color = guide_legend(override.aes = list(size = 3, alpha = 1)),
+#     shape = guide_legend(override.aes = list(size = 3)),
+#     linetype = guide_legend()
+#   ) +
+#   theme_light() +
+#   theme(
+#     legend.position = "right", 
+#     panel.grid.minor = element_blank()
+#   )
+# 
+# # 4. Assembly and Display
+# figure_finale <- g1 + g2 + plot_annotation(tag_levels = 'A')+
+#   plot_layout(axes = "collect")
+# figure_finale
+# 
+# 
+# ggsave(
+#   filename = "C:/Users/poula/Documents/M2_PAMEQ/Stage M2/Figures/Thermal Tolerance (T50) Evolution by month.png",
+#   plot = figure_finale,
+#   width = 18, height = 12, units = "cm", dpi = 300
+# )
 ```
 
 ```{r}
